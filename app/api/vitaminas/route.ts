@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   }
   try {
     const [result] = await pool.execute<ResultSetHeader>(
-      'INSERT INTO recetas (dni_paciente, nombre_paciente, vitaminaNombre, dosis, via, observaciones) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO recetas (dni_paciente, nombre_paciente, "vitaminaNombre", dosis, via, observaciones) VALUES (?, ?, ?, ?, ?, ?)',
       [dni, nombre, vitamina, String(body.dosis ?? ''), String(body.via ?? ''), String(body.observaciones ?? '')]
     );
     return NextResponse.json({ success: true, id: result.insertId }, { status: 201 });
@@ -43,7 +43,7 @@ export async function PATCH(request: Request) {
   const dni = new URL(request.url).searchParams.get('dni');
   if (!dni) return NextResponse.json({ error: 'DNI requerido' }, { status: 400 });
   try {
-    await pool.execute<ResultSetHeader>('UPDATE recetas SET activo = 0 WHERE dni_paciente = ?', [dni]);
+    await pool.execute<ResultSetHeader>('UPDATE recetas SET activo = FALSE WHERE dni_paciente = ?', [dni]);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error al desmarcar tratamiento:', error);
