@@ -8,8 +8,8 @@ export async function GET(request: Request) {
   const dni = new URL(request.url).searchParams.get('dni');
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
-      dni ? 'SELECT *, vitaminaNombre AS medicamento FROM recetas WHERE dni_paciente = ? ORDER BY id DESC'
-          : 'SELECT *, vitaminaNombre AS medicamento FROM recetas ORDER BY id DESC',
+      dni ? 'SELECT *, "vitaminaNombre" AS medicamento FROM recetas WHERE dni_paciente = ? ORDER BY id DESC'
+          : 'SELECT *, "vitaminaNombre" AS medicamento FROM recetas ORDER BY id DESC',
       dni ? [dni] : []
     );
     return NextResponse.json(rows);
