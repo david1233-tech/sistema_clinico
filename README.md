@@ -57,5 +57,11 @@ Patient records, payments, consultations, appointments, internamientos and vitam
 
 All three accounts use the same server and database, so records entered on one device are visible from another after its next data refresh. The three passwords and `AUTH_SECRET` must be set in Vercel before anyone can sign in; do not reuse the old passwords that were previously embedded in the browser code. The server sets an HTTP-only session cookie and checks the user's role on protected pages and API routes.
 
+### Base MySQL remota
+
+Una opción es [Railway MySQL](https://docs.railway.com/databases/mysql). Crea un servicio MySQL, habilita **Public Access** en Networking y copia su `MYSQL_PUBLIC_URL` a la variable `DATABASE_URL` de Vercel. Ejecuta `database/schema.sql` en esa base nueva antes de usar la aplicación. Si importas una base anterior, ejecuta primero `database/migrate-existing.sql`. Mantén cualquier exportación con datos de pacientes fuera de GitHub.
+
+Gaby registra citas y pagos desde su sesión de recepción. Doctora puede consultar esas mismas citas y pagos desde otro dispositivo; enfermera comparte la misma base para pacientes y triajes. Cada sesión conserva los permisos de su rol. La base local de la PC no se sincroniza automáticamente con la remota: para conservar sus registros anteriores, importa un respaldo de MySQL directamente al proveedor remoto.
+
 The Vercel HTTPS link can be installed as a mobile PWA from the login page or the browser's menu. This is not an Android APK. The PWA requires internet access for clinical records because they are stored on the server. A separate native Android build and a suitable web bundle would be required for an APK; the current server-based Next.js build does not produce the `out` directory configured for Capacitor.
 
