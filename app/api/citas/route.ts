@@ -10,11 +10,11 @@ export async function GET() {
       `SELECT c.id, COALESCE(c.dni_paciente, p.dni) AS dni_paciente,
        COALESCE(c.nombre_paciente, p.nombre) AS nombre_paciente,
        COALESCE(c.telefono, p.telefono) AS telefono,
-       DATE_FORMAT(COALESCE(c.fecha, DATE(c.fecha_hora_cita)), '%Y-%m-%d') AS fecha,
-       TIME_FORMAT(COALESCE(c.hora, TIME(c.fecha_hora_cita)), '%H:%i') AS hora,
+       TO_CHAR(COALESCE(c.fecha, c.fecha_hora_cita::date), 'YYYY-MM-DD') AS fecha,
+       TO_CHAR(COALESCE(c.hora, c.fecha_hora_cita::time), 'HH24:MI') AS hora,
        c.motivo, CASE WHEN c.estado = 'programada' THEN 'pendiente' ELSE c.estado END AS estado
        FROM citas c LEFT JOIN pacientes p ON p.id = c.paciente_id
-       ORDER BY COALESCE(c.fecha, DATE(c.fecha_hora_cita)) DESC, c.id DESC`
+       ORDER BY COALESCE(c.fecha, c.fecha_hora_cita::date) DESC, c.id DESC`
     );
     return NextResponse.json(rows);
   } catch (error) {
