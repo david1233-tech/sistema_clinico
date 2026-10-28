@@ -11,13 +11,13 @@ type Month = RowDataPacket & { mes: string; total: number };
 export async function GET() {
   try {
     const [pacientes] = await pool.query<Total[]>('SELECT COUNT(*) AS total FROM pacientes');
-    const [triajes] = await pool.query<Total[]>('SELECT COUNT(*) AS total FROM triaje WHERE DATE(fecha) = CURRENT_DATE()');
-    const [ingresos] = await pool.query<Total[]>('SELECT COALESCE(SUM(monto), 0) AS total FROM pagos WHERE DATE(fecha) = CURRENT_DATE()');
+    const [triajes] = await pool.query<Total[]>("SELECT COUNT(*) AS total FROM triaje WHERE (fecha AT TIME ZONE 'America/Lima')::date = (NOW() AT TIME ZONE 'America/Lima')::date");
+    const [ingresos] = await pool.query<Total[]>("SELECT COALESCE(SUM(monto), 0) AS total FROM pagos WHERE (fecha AT TIME ZONE 'America/Lima')::date = (NOW() AT TIME ZONE 'America/Lima')::date");
     const [ventas] = await pool.query<Sales[]>(
       `SELECT COALESCE(SUM(monto), 0) AS total, COUNT(*) AS transacciones,
        COALESCE(SUM(CASE WHEN LOWER(tipo_ingreso) = 'doctora' THEN 0 ELSE monto END), 0) AS caja,
        COALESCE(SUM(CASE WHEN LOWER(tipo_ingreso) = 'doctora' THEN monto ELSE 0 END), 0) AS doctora
-       FROM pagos WHERE YEAR(fecha) = YEAR(CURRENT_DATE()) AND MONTH(fecha) = MONTH(CURRENT_DATE())`
+       FROM pagos WHERE DATE_TRUNC('month', fecha AT TIME ZONE 'America/Lima') = DATE_TRUNC('month', NOW() AT TIME ZONE 'America/Lima')`
     );
     const [vitaminas] = await pool.query<Total[]>('SELECT COUNT(*) AS total FROM recetas');
     const [internados] = await pool.query<Total[]>('SELECT COUNT(*) AS total FROM internamientos');
@@ -26,9 +26,9 @@ export async function GET() {
     const [ultimosTriajes] = await pool.query<RowDataPacket[]>('SELECT * FROM triaje ORDER BY id DESC LIMIT 5');
     const [ultimosPagos] = await pool.query<RowDataPacket[]>('SELECT * FROM pagos ORDER BY id DESC LIMIT 5');
     const [meses] = await pool.query<Month[]>(
-      `SELECT DATE_FORMAT(fecha, '%Y-%m') AS mes, COALESCE(SUM(monto), 0) AS total
-       FROM pagos WHERE fecha >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH)
-       GROUP BY DATE_FORMAT(fecha, '%Y-%m') ORDER BY mes`
+      `SELECT TO_CHAR(fecha AT TIME ZONE 'America/Lima', 'YYYY-MM') AS mes, COALESCE(SUM(monto), 0) AS total
+       FROM pagos WHERE fecha >= NOW() - INTERVAL '3 months'
+       GROUP BY TO_CHAR(fecha AT TIME ZONE 'America/Lima', 'YYYY-MM') ORDER BY mes`
     );
     return NextResponse.json({
       metrics: {
