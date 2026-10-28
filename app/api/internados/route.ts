@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
-      "SELECT *, DATE_FORMAT(fecha_ingreso, '%Y-%m-%d') AS fecha_ingreso, DATE_FORMAT(fecha_estimada_salida, '%Y-%m-%d') AS fecha_estimada_salida, DATE_FORMAT(fecha_salida, '%Y-%m-%d') AS fecha_salida, TIME_FORMAT(hora_salida, '%H:%i') AS hora_salida FROM internamientos ORDER BY id DESC"
+      "SELECT *, TO_CHAR(fecha_ingreso, 'YYYY-MM-DD') AS fecha_ingreso, TO_CHAR(fecha_estimada_salida, 'YYYY-MM-DD') AS fecha_estimada_salida, TO_CHAR(fecha_salida, 'YYYY-MM-DD') AS fecha_salida, TO_CHAR(hora_salida, 'HH24:MI') AS hora_salida FROM internamientos ORDER BY id DESC"
     );
     return NextResponse.json(rows);
   } catch (error) {
