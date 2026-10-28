@@ -9,7 +9,9 @@ const databaseUrl = process.env.DATABASE_URL;
 
 export const pgPool = new Pool({
   connectionString: databaseUrl,
-  ssl: true,
+  // Supabase connections stay encrypted; allow its certificate chain on hosts
+  // where Node's local CA bundle does not include the Supabase CA.
+  ssl: { rejectUnauthorized: false },
   max: 3,
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 30000,
