@@ -46,8 +46,8 @@ You can use a single `DATABASE_URL` (or Railway's `MYSQL_PUBLIC_URL`) in `mysql:
 | `DB_NAME` | Database name |
 | `AUTH_SECRET` | Long random value used to sign the seven-day login session |
 | `DOCTORA_PASSWORD` | Password for `SusanaVital` |
-| `ENFERMERA_PASSWORD` | Password for `PilarVITAL` |
-| `RECEPCION_PASSWORD` | Password for `GabyVITAL` |
+| `ENFERMERA_PASSWORD` | Password for `PilarVital` |
+| `RECEPCION_PASSWORD` | Password for `GabyVital` |
 
 The local defaults are `localhost:3306`, user `root`, an empty password, and database `clinica_db`. A database running only on your computer cannot be reached from Vercel. For a new remote database, run `database/schema.sql`. For a database with the older `citas` and `pagos` tables, run `database/migrate-existing.sql` first and then `database/schema.sql`. The legacy migration has already been applied to the local `clinica_db` database. After configuring Vercel and migrating its database, redeploy. Do not run the legacy migration twice because it adds columns.
 
@@ -58,6 +58,12 @@ Patient records, payments, consultations, appointments, internamientos and vitam
 All three accounts use the same server and database, so records entered on one device are visible from another after its next data refresh. The three passwords and `AUTH_SECRET` must be set in Vercel before anyone can sign in; do not reuse the old passwords that were previously embedded in the browser code. The server sets an HTTP-only session cookie and checks the user's role on protected pages and API routes.
 
 ### Base MySQL remota
+
+### Actualizar las claves en Vercel
+
+En el proyecto de Vercel abre **Settings → Environment Variables** y agrega `DOCTORA_PASSWORD`, `ENFERMERA_PASSWORD`, `RECEPCION_PASSWORD` y `AUTH_SECRET` al entorno **Production**. Usa `SusanaVital`, `PilarVital` y `GabyVital` como nombres de usuario; el sistema también acepta las variantes anteriores con otras mayúsculas. `AUTH_SECRET` debe ser un valor aleatorio largo, distinto de las contraseñas. Puedes generarlo con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Después abre **Deployments**, selecciona el último despliegue y pulsa **Redeploy**: los cambios en variables se aplican a un despliegue nuevo. El repositorio público no contiene las contraseñas.
+
+Para guardar y compartir datos entre dispositivos, configura también `DATABASE_URL` con una base MySQL remota e instala `database/schema.sql` en ella. Un MySQL que solo corre en la computadora local no estará disponible para Vercel.
 
 Una opción es [Railway MySQL](https://docs.railway.com/databases/mysql). Crea un servicio MySQL, habilita **Public Access** en Networking y copia su `MYSQL_PUBLIC_URL` a la variable `DATABASE_URL` de Vercel. Ejecuta `database/schema.sql` en esa base nueva antes de usar la aplicación. Si importas una base anterior, ejecuta primero `database/migrate-existing.sql`. Mantén cualquier exportación con datos de pacientes fuera de GitHub.
 
