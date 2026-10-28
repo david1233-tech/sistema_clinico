@@ -4,8 +4,8 @@ import { createSession, SESSION_COOKIE, type Role } from '@/lib/auth';
 
 const accounts: { username: string; role: Role; name: string; env: string; next: string }[] = [
   { username: 'SusanaVital', role: 'doctora', name: 'Dra. Susana', env: 'DOCTORA_PASSWORD', next: '/dashboard' },
-  { username: 'PilarVITAL', role: 'enfermera', name: 'Enf. Pilar', env: 'ENFERMERA_PASSWORD', next: '/enfermeria' },
-  { username: 'GabyVITAL', role: 'recepcion', name: 'Recep. Gaby', env: 'RECEPCION_PASSWORD', next: '/agenda' },
+  { username: 'PilarVital', role: 'enfermera', name: 'Enf. Pilar', env: 'ENFERMERA_PASSWORD', next: '/enfermeria' },
+  { username: 'GabyVital', role: 'recepcion', name: 'Recep. Gaby', env: 'RECEPCION_PASSWORD', next: '/agenda' },
 ];
 
 function equal(a: string, b: string) {
@@ -24,7 +24,8 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 });
   }
-  const account = accounts.find(item => item.username === body.usuario);
+  const username = typeof body.usuario === 'string' ? body.usuario.trim().toLowerCase() : '';
+  const account = accounts.find(item => item.username.toLowerCase() === username);
   if (!account || typeof body.password !== 'string' || !equal(body.password, process.env[account.env] || '')) {
     return NextResponse.json({ error: 'Usuario o contraseña incorrectos.' }, { status: 401 });
   }
