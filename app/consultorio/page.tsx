@@ -524,7 +524,8 @@ function ConsultorioPageContent() {
           });
         }
       });
-      triajesData.forEach((t) => {
+      // La API devuelve el más reciente primero; aplicar el último al final.
+      triajesData.slice().reverse().forEach((t) => {
         const dni = t.dni_paciente || t.dni;
         if (dni) {
           const prev = mapaPacientes.get(dni);

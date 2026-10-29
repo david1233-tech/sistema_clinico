@@ -110,7 +110,8 @@ function VitaminasPageContent() {
           });
         }
       });
-      triajesData.forEach((t) => {
+      // Con varios registros por paciente, prevalecen los datos del más reciente.
+      triajesData.slice().reverse().forEach((t) => {
         const dni = t.dni_paciente || t.dni;
         if (dni) {
           const prev = mapaPacientes.get(dni);

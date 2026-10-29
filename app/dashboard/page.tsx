@@ -55,11 +55,11 @@ export default function DashboardPage() {
       const caja = await cajaResponse.json();
       const cobros: any[] = caja.pagos || [];
 
-      const totalPacientes = pacientes.length > 0 ? pacientes.length : triajes.length;
+      const totalPacientes = pacientes.length > 0 ? pacientes.length : new Set(triajes.map(t => t.dni_paciente)).size;
       const totalRecaudadoNum = cobros.reduce((acc, curr) => acc + (Number(curr.monto) || 0), 0);
 
       setStats({
-        totalPacientes: totalPacientes || triajes.length,
+        totalPacientes,
         triajesHoy: triajes.length,
         ingresosHoy: `S/ ${totalRecaudadoNum.toFixed(2)}`
       });
@@ -411,7 +411,7 @@ export default function DashboardPage() {
                         <strong className="text-slate-900 uppercase block">{t.nombre_paciente || 'Paciente'}</strong>
                         <span className="text-slate-500">DNI: {t.dni_paciente} • T°: {t.temperatura}°C • Peso: {t.peso}kg</span>
                       </div>
-                      <span className="text-[10px] text-teal-700 font-bold bg-teal-50 px-2 py-1 rounded-md">{t.fecha_hora || 'Hoy'}</span>
+                      <span className="text-[10px] text-teal-700 font-bold bg-teal-50 px-2 py-1 rounded-md">{t.fecha ? new Date(t.fecha).toLocaleDateString('es-PE') : t.fecha_hora || 'Sin fecha'}</span>
                     </div>
                   ))}
                 </div>

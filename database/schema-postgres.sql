@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS triaje (
   presion VARCHAR(30),
   frecuencia_respiratoria VARCHAR(30),
   glucosa VARCHAR(50),
+  datos_opcionales JSONB NOT NULL DEFAULT '{}'::jsonb,
   observaciones TEXT,
   fecha TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

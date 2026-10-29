@@ -1,15 +1,22 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
-import { ensureTriajeCampos } from '@/lib/triaje-campos';
+import { CAMPOS_OPCIONALES_TRIAJE, datosOpcionalesTriaje, ensureTriajeCampos } from '@/lib/triaje-campos';
 import type { ResultSetHeader } from 'mysql2';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     await ensureTriajeCampos();
-    const [triajes] = await pool.query<Record<string, unknown>[]>('SELECT *, presion AS presion_arterial FROM triaje ORDER BY id DESC');
-    return NextResponse.json(triajes);
+    const dni = new URL(request.url).searchParams.get('dni');
+    const [triajes] = await pool.query<Record<string, unknown>[]>(
+      `SELECT *, presion AS presion_arterial FROM triaje ${dni ? 'WHERE dni_paciente = ?' : ''} ORDER BY id DESC`,
+      dni ? [dni] : []
+    );
+    return NextResponse.json(triajes.map(triaje => ({
+      ...triaje,
+      ...(typeof triaje.datos_opcionales === 'object' && triaje.datos_opcionales !== null ? triaje.datos_opcionales : {})
+    })));
   } catch (error) {
     console.error('Error al obtener triajes:', error);
     return NextResponse.json({ error: 'Error interno al obtener triajes' }, { status: 500 });
@@ -32,6 +39,7 @@ export async function POST(request: Request) {
     let frecuencia_respiratoria = '';
     let glucosa = '';
     let observaciones = '';
+    let datosOpcionales: Record<string, unknown> = {};
     
     const contentType = request.headers.get('content-type') || '';
     
@@ -52,6 +60,7 @@ export async function POST(request: Request) {
       frecuencia_respiratoria = formData.get('frecuencia_respiratoria')?.toString() || '';
       glucosa = formData.get('glucosa')?.toString() || '';
       observaciones = formData.get('observaciones')?.toString() || '';
+      datosOpcionales = Object.fromEntries(CAMPOS_OPCIONALES_TRIAJE.map(campo => [campo, formData.get(campo)?.toString() || '']));
     } else {
       const body = await request.json();
       dni_paciente = body.dni_paciente || '';
@@ -68,6 +77,7 @@ export async function POST(request: Request) {
       frecuencia_respiratoria = body.frecuencia_respiratoria || '';
       glucosa = body.glucosa || '';
       observaciones = body.observaciones || '';
+      datosOpcionales = datosOpcionalesTriaje(body);
     }
 
     if (!dni_paciente) {
@@ -77,8 +87,8 @@ export async function POST(request: Request) {
     await ensureTriajeCampos();
     const [result] = await pool.query<ResultSetHeader>(
       `INSERT INTO triaje 
-        (dni_paciente, nombre_paciente, edad, talla, peso, imc, pulso, so2, temperatura, hb, presion, frecuencia_respiratoria, glucosa, observaciones) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (dni_paciente, nombre_paciente, edad, talla, peso, imc, pulso, so2, temperatura, hb, presion, frecuencia_respiratoria, glucosa, datos_opcionales, observaciones) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         dni_paciente,
         nombre_paciente || 'Paciente Sin Nombre',
@@ -93,6 +103,7 @@ export async function POST(request: Request) {
         presion || null,
         frecuencia_respiratoria || null,
         glucosa || null,
+        JSON.stringify(datosOpcionales),
         observaciones || ''
       ]
     );
@@ -113,6 +124,7 @@ export async function POST(request: Request) {
       presion_arterial: presion,
       frecuencia_respiratoria,
       glucosa,
+      ...datosOpcionales,
       observaciones,
       fecha: new Date().toISOString()
     };
@@ -155,7 +167,7 @@ export async function PUT(request: Request) {
     await ensureTriajeCampos();
     const [result] = await pool.execute<ResultSetHeader>(
       `UPDATE triaje SET dni_paciente = ?, nombre_paciente = ?, edad = ?, talla = ?, peso = ?, imc = ?,
-       pulso = ?, so2 = ?, temperatura = ?, hb = ?, presion = ?, frecuencia_respiratoria = ?, glucosa = ?, observaciones = ? WHERE id = ?`,
+       pulso = ?, so2 = ?, temperatura = ?, hb = ?, presion = ?, frecuencia_respiratoria = ?, glucosa = ?, datos_opcionales = ?, observaciones = ? WHERE id = ?`,
       [String(body.dni_paciente ?? ''), String(body.nombre_paciente ?? ''), body.edad ? String(body.edad) : null,
         body.talla ? String(body.talla) : null, body.peso ? String(body.peso) : null,
         body.imc ? String(body.imc) : null, body.pulso ? String(body.pulso) : null,
@@ -163,6 +175,7 @@ export async function PUT(request: Request) {
         body.hb ? String(body.hb) : null, body.presion_arterial || body.presion ? String(body.presion_arterial ?? body.presion) : null,
         body.frecuencia_respiratoria ? String(body.frecuencia_respiratoria) : null,
         body.glucosa ? String(body.glucosa) : null,
+        JSON.stringify(datosOpcionalesTriaje(body)),
         String(body.observaciones ?? ''), String(body.id)]
     );
     if (!result.affectedRows) return NextResponse.json({ error: 'Triaje no encontrado' }, { status: 404 });

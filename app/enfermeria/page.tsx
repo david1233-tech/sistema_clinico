@@ -8,6 +8,7 @@ interface Triaje {
   dni_paciente: string;
   nombre_paciente: string;
   fecha_hora?: string;
+  fecha?: string;
   edad: string | number;
   talla: string | number;
   peso: string | number;
@@ -48,6 +49,55 @@ interface Triaje {
 
 interface Adjunto { id: number; nombre: string; tipo: string; fecha: string }
 const MAX_ADJUNTOS_TRIAJE = 200;
+const CAMPOS_DETALLE: { campo: keyof Triaje; etiqueta: string }[] = [
+  { campo: 'edad', etiqueta: 'Edad' }, { campo: 'talla', etiqueta: 'Talla (cm)' },
+  { campo: 'peso', etiqueta: 'Peso (kg)' }, { campo: 'imc', etiqueta: 'IMC' },
+  { campo: 'pulso', etiqueta: 'Pulso' }, { campo: 'so2', etiqueta: 'SO2 (%)' },
+  { campo: 'temperatura', etiqueta: 'Temperatura (°C)' },
+  { campo: 'presion_arterial', etiqueta: 'P/A (mmHg)' },
+  { campo: 'frecuencia_respiratoria', etiqueta: 'F. respiratoria (rpm)' },
+  { campo: 'hb', etiqueta: 'Hemoglobina (HB)' }, { campo: 'glucosa', etiqueta: 'Glucosa' },
+  { campo: 'agua_porcentaje', etiqueta: 'Agua (%)' }, { campo: 'grasa_porcentaje', etiqueta: 'Grasa (%)' },
+  { campo: 'grasa_visceral', etiqueta: 'Grasa visceral' },
+  { campo: 'musculo_esqueletico_porcentaje', etiqueta: 'Músculo esquelético (%)' },
+  { campo: 'musculos_porcentaje', etiqueta: 'Músculos (%)' },
+  { campo: 'metabolismo', etiqueta: 'Metabolismo' }, { campo: 'proteina', etiqueta: 'Proteína' },
+  { campo: 'grado_obesidad_porcentaje', etiqueta: 'Grado de obesidad (%)' },
+  { campo: 'edad_metabolica', etiqueta: 'Edad metabólica' },
+  { campo: 'circunferencia_abdominal', etiqueta: 'Circunferencia abdominal' },
+  { campo: 'globulos_rojos', etiqueta: 'Glóbulos rojos' },
+  { campo: 'globulos_blancos', etiqueta: 'Glóbulos blancos' },
+  { campo: 'hb_glicosilada', etiqueta: 'Hb. glicosilada' }, { campo: 'vcm', etiqueta: 'VCM' },
+  { campo: 'colesterol', etiqueta: 'Colesterol' }, { campo: 'trigliceridos', etiqueta: 'Triglicéridos' },
+  { campo: 'creatinina', etiqueta: 'Creatinina' }, { campo: 'urea', etiqueta: 'Urea' },
+  { campo: 'tgo', etiqueta: 'TGO' }, { campo: 'tgp', etiqueta: 'TGP' },
+  { campo: 't3_t4_tsh', etiqueta: 'T3-T4-TSH' },
+  { campo: 'examenes_solicitados', etiqueta: 'Exámenes solicitados' },
+  { campo: 'antecedentes', etiqueta: 'Antecedentes' },
+  { campo: 'observaciones', etiqueta: 'Observaciones' }
+];
+
+function crearFormularioTriaje(dni_paciente = '', nombre_paciente = '', edad = '') {
+  return {
+    dni_paciente, nombre_paciente, edad,
+    talla: '', peso: '', imc: '', pulso: '', so2: '', temperatura: '', hb: '',
+    agua_porcentaje: '', grasa_porcentaje: '', grasa_visceral: '',
+    musculo_esqueletico_porcentaje: '', musculos_porcentaje: '', metabolismo: '',
+    proteina: '', grado_obesidad_porcentaje: '', edad_metabolica: '',
+    circunferencia_abdominal: '', presion_arterial: '', frecuencia_respiratoria: '',
+    glucosa: '', globulos_rojos: '', globulos_blancos: '', hb_glicosilada: '',
+    vcm: '', colesterol: '', trigliceridos: '', creatinina: '', urea: '',
+    tgo: '', tgp: '', t3_t4_tsh: '', examenes_solicitados: '',
+    antecedentes: '', observaciones: '', archivo_adjunto: ''
+  };
+}
+
+function fechaTriaje(t: Triaje) {
+  const fecha = t.fecha || t.fecha_hora;
+  if (!fecha) return `Registro #${t.id}`;
+  const parsed = new Date(fecha);
+  return Number.isNaN(parsed.getTime()) ? fecha : parsed.toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
+}
 
 function EnfermeriaContent() {
   const searchParams = useSearchParams();
@@ -59,6 +109,11 @@ function EnfermeriaContent() {
   const [buscandoDni, setBuscandoDni] = useState<boolean>(false);
   const [filtro, setFiltro] = useState<string>('');
   const [mostrarOpcionales, setMostrarOpcionales] = useState<boolean>(true);
+  const [dniHistorial, setDniHistorial] = useState<string | null>(null);
+  const [detalleTriaje, setDetalleTriaje] = useState<Triaje | null>(null);
+  const [adjuntosDetalle, setAdjuntosDetalle] = useState<Adjunto[]>([]);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
+  const [registroPendienteId, setRegistroPendienteId] = useState<string | number | null>(null);
   
   const [triajeImprimir, setTriajeImprimir] = useState<Triaje | null>(null);
   const [archivoModal, setArchivoModal] = useState<string | null>(null);
@@ -71,46 +126,7 @@ function EnfermeriaContent() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const [form, setForm] = useState({
-    dni_paciente: '',
-    nombre_paciente: '',
-    edad: '',
-    talla: '',
-    peso: '',
-    imc: '',
-    pulso: '',
-    so2: '',
-    temperatura: '',
-    hb: '',
-    agua_porcentaje: '',
-    grasa_porcentaje: '',
-    grasa_visceral: '',
-    musculo_esqueletico_porcentaje: '',
-    musculos_porcentaje: '',
-    metabolismo: '',
-    proteina: '',
-    grado_obesidad_porcentaje: '',
-    edad_metabolica: '',
-    circunferencia_abdominal: '',
-    presion_arterial: '',
-    frecuencia_respiratoria: '',
-    glucosa: '',
-    globulos_rojos: '',
-    globulos_blancos: '',
-    hb_glicosilada: '',
-    vcm: '',
-    colesterol: '',
-    trigliceridos: '',
-    creatinina: '',
-    urea: '',
-    tgo: '',
-    tgp: '',
-    t3_t4_tsh: '',
-    examenes_solicitados: '',
-    antecedentes: '',
-    observaciones: '',
-    archivo_adjunto: ''
-  });
+  const [form, setForm] = useState(crearFormularioTriaje);
 
   useEffect(() => {
     fetchTriajes();
@@ -210,21 +226,19 @@ function EnfermeriaContent() {
   };
 
   const cargarDatosPacientePorDni = async (dni: string) => {
-    if (!dni) return;
+    if (!/^\d{8}$/.test(dni)) return;
     try {
       setBuscandoDni(true);
       const triajeExistente = triajes.find(t => t.dni_paciente === dni);
-      if (triajeExistente) {
-        handleSeleccionarHistorial(triajeExistente);
-        return;
-      }
       const enc = pacientesRegistrados.find(p => (p.dni || p.dni_paciente) === dni);
-      if (enc) {
+      if (enc || triajeExistente) {
+        const nombre = enc?.nombre || enc?.nombre_paciente || triajeExistente?.nombre_paciente || '';
+        const edad = enc?.edad || triajeExistente?.edad;
         setForm(prev => ({
           ...prev,
-          dni_paciente: enc.dni || enc.dni_paciente || dni,
-          nombre_paciente: enc.nombre || enc.nombre_paciente || prev.nombre_paciente,
-          edad: enc.edad ? String(enc.edad) : prev.edad
+          dni_paciente: dni,
+          nombre_paciente: nombre || prev.nombre_paciente,
+          edad: edad ? String(edad) : prev.edad
         }));
       } else {
         const res = await fetch('/api/pacientes');
@@ -251,43 +265,25 @@ function EnfermeriaContent() {
   };
 
   const handleSelectPaciente = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (registroPendienteId) return;
     const dniElegido = e.target.value;
     if (!dniElegido) {
       setAdjuntos([]);
       setPendientes([]);
-      setForm(prev => ({
-        ...prev,
-        dni_paciente: '', nombre_paciente: '', edad: '', talla: '', peso: '', imc: '',
-        pulso: '', so2: '', temperatura: '', hb: '', agua_porcentaje: '', grasa_porcentaje: '',
-        grasa_visceral: '', musculo_esqueletico_porcentaje: '', musculos_porcentaje: '',
-        metabolismo: '', proteina: '', grado_obesidad_porcentaje: '', edad_metabolica: '',
-        circunferencia_abdominal: '', presion_arterial: '', frecuencia_respiratoria: '',
-        glucosa: '', globulos_rojos: '', globulos_blancos: '', hb_glicosilada: '', vcm: '',
-        colesterol: '', trigliceridos: '', creatinina: '', urea: '', tgo: '', tgp: '',
-        t3_t4_tsh: '', examenes_solicitados: '', antecedentes: '', observaciones: '', archivo_adjunto: ''
-      }));
+      setRegistroPendienteId(null);
+      setForm(crearFormularioTriaje());
       return;
     }
     const triajeExistente = triajes.find(t => t.dni_paciente === dniElegido);
-    if (triajeExistente) {
-      handleSeleccionarHistorial(triajeExistente);
-    } else {
-      setAdjuntos([]);
-      setPendientes([]);
-      const paciente = pacientesRegistrados.find(p => (p.dni === dniElegido || p.dni_paciente === dniElegido));
-      if (paciente) {
-        const nombre = paciente.nombre || paciente.nombre_paciente || '';
-        setForm(prev => ({
-          ...prev,
-          dni_paciente: paciente.dni || paciente.dni_paciente || '',
-          nombre_paciente: nombre,
-          edad: paciente.edad ? String(paciente.edad) : (prev.dni_paciente === dniElegido ? prev.edad : ''),
-          talla: prev.dni_paciente === dniElegido ? prev.talla : '',
-          peso: prev.dni_paciente === dniElegido ? prev.peso : '',
-          imc: prev.dni_paciente === dniElegido ? prev.imc : ''
-        }));
-      }
-    }
+    const paciente = pacientesRegistrados.find(p => (p.dni === dniElegido || p.dni_paciente === dniElegido));
+    setAdjuntos([]);
+    setPendientes([]);
+    setRegistroPendienteId(null);
+    setForm(crearFormularioTriaje(
+      dniElegido,
+      paciente?.nombre || paciente?.nombre_paciente || triajeExistente?.nombre_paciente || '',
+      paciente?.edad || triajeExistente?.edad ? String(paciente?.edad || triajeExistente?.edad) : ''
+    ));
     localStorage.setItem('paciente_activo_vital_salud', JSON.stringify({ dni: dniElegido }));
     window.dispatchEvent(new Event('paciente_activo_changed'));
   };
@@ -335,58 +331,29 @@ function EnfermeriaContent() {
     else alert('No se pudo eliminar el adjunto.');
   };
 
-  const handleSeleccionarHistorial = (t: Triaje) => {
-    setPendientes([]);
-    setAdjuntos([]);
-    setCarpetaAbierta(false);
-    cargarAdjuntos(t.id);
-    setForm({
-      dni_paciente: t.dni_paciente || '',
-      nombre_paciente: t.nombre_paciente || '',
-      edad: t.edad ? String(t.edad) : '',
-      talla: t.talla ? String(t.talla) : '',
-      peso: t.peso ? String(t.peso) : '',
-      imc: t.imc ? String(t.imc) : '',
-      pulso: t.pulso ? String(t.pulso) : '',
-      so2: t.so2 ? String(t.so2) : '',
-      temperatura: t.temperatura ? String(t.temperatura) : '',
-      hb: t.hb ? String(t.hb) : '',
-      agua_porcentaje: t.agua_porcentaje || '',
-      grasa_porcentaje: t.grasa_porcentaje || '',
-      grasa_visceral: t.grasa_visceral || '',
-      musculo_esqueletico_porcentaje: t.musculo_esqueletico_porcentaje || '',
-      musculos_porcentaje: t.musculos_porcentaje || '',
-      metabolismo: t.metabolismo || '',
-      proteina: t.proteina || '',
-      grado_obesidad_porcentaje: t.grado_obesidad_porcentaje || '',
-      edad_metabolica: t.edad_metabolica || '',
-      circunferencia_abdominal: t.circunferencia_abdominal || '',
-      presion_arterial: t.presion_arterial || '',
-      frecuencia_respiratoria: t.frecuencia_respiratoria || '',
-      glucosa: t.glucosa || '',
-      globulos_rojos: t.globulos_rojos || '',
-      globulos_blancos: t.globulos_blancos || '',
-      hb_glicosilada: t.hb_glicosilada || '',
-      vcm: t.vcm || '',
-      colesterol: t.colesterol || '',
-      trigliceridos: t.trigliceridos || '',
-      creatinina: t.creatinina || '',
-      urea: t.urea || '',
-      tgo: t.tgo || '',
-      tgp: t.tgp || '',
-      t3_t4_tsh: t.t3_t4_tsh || '',
-      examenes_solicitados: t.examenes_solicitados || '',
-      antecedentes: t.antecedentes || '',
-      observaciones: t.observaciones || '',
-      archivo_adjunto: t.archivo_adjunto || ''
-    });
-    setMostrarOpcionales(true);
+  const abrirDetalleTriaje = async (t: Triaje) => {
+    setDetalleTriaje(t);
+    setAdjuntosDetalle([]);
+    setCargandoDetalle(true);
+    try {
+      const res = await fetch(`/api/triaje/adjuntos?id=${t.id}`);
+      if (!res.ok) throw new Error('No se pudieron cargar los adjuntos del registro');
+      setAdjuntosDetalle(await res.json());
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'No se pudieron cargar los adjuntos');
+    } finally {
+      setCargandoDetalle(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === 'dni_paciente') {
-      setForm(prev => ({ ...prev, dni_paciente: value, peso: '', talla: '', imc: '' }));
+      if (registroPendienteId) return;
+      setForm(prev => prev.dni_paciente === value ? prev : crearFormularioTriaje(value));
+      setAdjuntos([]);
+      setPendientes([]);
+      setRegistroPendienteId(null);
       cargarDatosPacientePorDni(value);
     } else if (name === 'peso' || name === 'imc') {
       setForm(prev => ({ ...prev, [name]: value.replace(/,/g, '.') }));
@@ -403,47 +370,26 @@ function EnfermeriaContent() {
     }
     try {
       setSaving(true);
-      const fechaActual = new Date().toLocaleString('es-PE', {
-        day: '2-digit', month: '2-digit', year: '2-digit',
-        hour: '2-digit', minute: '2-digit', hour12: true
-      });
-      const indexExistente = triajes.findIndex(t => t.dni_paciente === form.dni_paciente);
-      if (indexExistente >= 0) {
-        const triajesCopia = [...triajes];
-        const idExistente = triajesCopia[indexExistente].id;
-        const triajeActualizado: Triaje = {
-          ...triajesCopia[indexExistente],
-          ...form,
-          id: idExistente,
-          fecha_hora: fechaActual
-        };
-        triajesCopia[indexExistente] = triajeActualizado;
-        const response = await fetch('/api/triaje', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(triajeActualizado)
-        });
-        if (!response.ok) throw new Error((await response.json()).error || 'No se pudo guardar el triaje');
-        await subirPendientes(idExistente);
-        setTriajes(triajesCopia);
-        alert('📋 Triaje del paciente actualizado exitosamente.');
-      } else {
-        const nuevoTriaje: Triaje = {
-          id: Date.now(),
-          fecha_hora: fechaActual,
-          ...form
-        };
+      let id = registroPendienteId;
+      if (!id) {
         const res = await fetch('/api/triaje', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(nuevoTriaje)
+          body: JSON.stringify(form)
         });
         if (!res.ok) throw new Error((await res.json()).error || 'No se pudo guardar el triaje');
         const creado = await res.json();
-        await subirPendientes(creado.data.id);
-        await fetchTriajes();
-        alert('📋 Nuevo triaje clínico registrado exitosamente.');
+        id = creado.data.id;
+        setRegistroPendienteId(id);
       }
+      if (!id) throw new Error('No se recibió el identificador del triaje');
+      await subirPendientes(id);
+      await fetchTriajes();
+      setForm(crearFormularioTriaje(form.dni_paciente, form.nombre_paciente, form.edad));
+      setAdjuntos([]);
+      setPendientes([]);
+      setRegistroPendienteId(null);
+      alert('📋 Nuevo registro de triaje guardado. Los registros anteriores se conservaron.');
     } catch (err) {
       console.error('Error guardando triaje:', err);
       await fetchTriajes();
@@ -461,6 +407,7 @@ function EnfermeriaContent() {
         const response = await fetch(`/api/triaje?id=${id}`, { method: 'DELETE' });
         if (!response.ok) throw new Error((await response.json()).error || 'No se pudo eliminar el triaje');
         setTriajes(prev => prev.filter(t => t.id !== id));
+        if (detalleTriaje?.id === id) setDetalleTriaje(null);
       } catch (err) {
         alert(err instanceof Error ? err.message : 'No se pudo eliminar el triaje');
       }
@@ -475,10 +422,16 @@ function EnfermeriaContent() {
     }, 200);
   };
 
-  const triajesFiltrados = triajes.filter(t =>
-    (t.nombre_paciente || '').toLowerCase().includes(filtro.toLowerCase()) ||
-    (t.dni_paciente || '').includes(filtro)
+  const historialAgrupado = Array.from(triajes.reduce((grupos, triaje) => {
+    const registros = grupos.get(triaje.dni_paciente) || [];
+    registros.push(triaje);
+    grupos.set(triaje.dni_paciente, registros);
+    return grupos;
+  }, new Map<string, Triaje[]>()).values()).filter(registros =>
+    registros[0].nombre_paciente.toLowerCase().includes(filtro.toLowerCase()) ||
+    registros[0].dni_paciente.includes(filtro)
   );
+  const registrosPaciente = triajes.filter(t => t.dni_paciente === dniHistorial);
 
   return (
     <>
@@ -492,7 +445,7 @@ function EnfermeriaContent() {
                 <p className="text-xs text-slate-600 m-0">Ficha Oficial de Triaje y Signos Vitales</p>
               </div>
               <span className="text-xs font-bold bg-slate-100 p-2 rounded border border-slate-300">
-                📅 Fecha y Hora: {triajeImprimir.fecha_hora || new Date().toLocaleString('es-PE')}
+                📅 Fecha y Hora: {fechaTriaje(triajeImprimir)}
               </span>
             </div>
             <div className="bg-slate-50 p-3 rounded mb-4 border border-slate-200">
@@ -571,6 +524,7 @@ function EnfermeriaContent() {
                   <select
                     onChange={handleSelectPaciente}
                     value={form.dni_paciente}
+                    disabled={saving || Boolean(registroPendienteId)}
                     className="w-full p-2.5 rounded-xl border border-teal-300 bg-white font-bold text-slate-900 text-xs outline-none cursor-pointer shadow-sm"
                   >
                     <option value="">-- Seleccionar paciente de la lista --</option>
@@ -594,6 +548,7 @@ function EnfermeriaContent() {
                       name="dni_paciente"
                       value={form.dni_paciente}
                       onChange={handleChange}
+                      disabled={saving || Boolean(registroPendienteId)}
                       placeholder="Ej: 71234567"
                       className="w-full p-2.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs outline-none focus:border-teal-600 focus:bg-white"
                       required
@@ -724,6 +679,9 @@ function EnfermeriaContent() {
                     </div>
                   </div>
                 </div>
+                <p className="m-0 text-xs text-teal-800 font-semibold">
+                  {registroPendienteId ? 'El registro ya se creó. Termine de subir los adjuntos pendientes con el botón de abajo.' : 'Cada guardado crea un registro nuevo para este paciente y conserva los anteriores.'}
+                </p>
                 <button
                   type="button"
                   onClick={() => setMostrarOpcionales(!mostrarOpcionales)}
@@ -929,7 +887,7 @@ function EnfermeriaContent() {
                   disabled={saving}
                   className="w-full py-3 bg-teal-700 hover:bg-teal-800 text-white font-extrabold text-sm rounded-xl border-none cursor-pointer shadow-md transition-all flex items-center justify-center gap-2"
                 >
-                  <span>🩺</span> {saving ? 'Guardando Triaje...' : 'Guardar Triaje Clínico'}
+                  <span>🩺</span> {saving ? 'Guardando triaje...' : registroPendienteId ? 'Reintentar adjuntos pendientes' : 'Guardar nuevo registro de triaje'}
                 </button>
               </form>
             </div>
@@ -956,18 +914,19 @@ function EnfermeriaContent() {
               <div className="p-4 flex flex-col gap-3.5 max-h-[750px] overflow-y-auto">
                 {loading ? (
                   <div className="p-8 text-center text-slate-500 text-xs">Cargando registros de triaje...</div>
-                ) : triajesFiltrados.length === 0 ? (
+                ) : historialAgrupado.length === 0 ? (
                   <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">
                     <div className="text-3xl mb-2">🩺</div>
                     <p className="m-0 text-slate-700 text-xs font-bold">No hay registros de triaje.</p>
                   </div>
                 ) : (
-                  triajesFiltrados.map((t, idx) => {
+                  historialAgrupado.map((registros, idx) => {
+                    const t = registros[0];
                     const isSelected = form.dni_paciente === t.dni_paciente;
                     return (
                       <div
                         key={t.id || idx}
-                        onClick={() => handleSeleccionarHistorial(t)}
+                        onClick={() => { setDniHistorial(t.dni_paciente); setDetalleTriaje(null); }}
                         className={`bg-white rounded-2xl border p-4 flex flex-col gap-2.5 shadow-sm cursor-pointer transition-all ${
                           isSelected 
                             ? 'border-teal-500 bg-teal-50/40 ring-2 ring-teal-500/20' 
@@ -986,8 +945,15 @@ function EnfermeriaContent() {
                           </div>
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             <span className="text-[11px] text-slate-500 font-bold bg-slate-100 px-2.5 py-1 rounded-full">
-                              🕒 {t.fecha_hora || 'Hoy'}
+                              🕒 {fechaTriaje(t)}
                             </span>
+                            <button
+                              type="button"
+                              onClick={() => { setDniHistorial(t.dni_paciente); setDetalleTriaje(null); }}
+                              className="bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 px-2.5 py-1 rounded-lg text-xs font-extrabold cursor-pointer"
+                            >
+                              📋 Ver registros ({registros.length})
+                            </button>
                             <button
                               type="button"
                               onClick={(e) => ejecutarImpresionTriaje(t, e)}
@@ -1000,7 +966,7 @@ function EnfermeriaContent() {
                               onClick={(e) => handleEliminarTriaje(t.id, e)}
                               className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-2 py-1 rounded-lg text-xs font-extrabold cursor-pointer"
                             >
-                              🗑️ Eliminar
+                              🗑️ Eliminar último
                             </button>
                           </div>
                         </div>
@@ -1016,39 +982,11 @@ function EnfermeriaContent() {
                           {t.presion_arterial && <span className="bg-teal-50 text-teal-900 border border-teal-200 px-2 py-1 rounded-lg font-bold">P/A: {t.presion_arterial}</span>}
                           {t.frecuencia_respiratoria && <span className="bg-teal-50 text-teal-900 border border-teal-200 px-2 py-1 rounded-lg font-bold">F. Resp: {t.frecuencia_respiratoria} rpm</span>}
                         </div>
-                        {/* DATOS OPCIONALES RELLENADOS */}
-                        {(t.hb || t.glucosa || t.agua_porcentaje || t.grasa_porcentaje || t.grasa_visceral || t.colesterol || t.trigliceridos || t.antecedentes || t.creatinina || t.urea || t.musculo_esqueletico_porcentaje || t.musculos_porcentaje || t.metabolismo || t.proteina || t.edad_metabolica || t.circunferencia_abdominal || t.globulos_rojos || t.globulos_blancos || t.hb_glicosilada || t.vcm || t.tgo || t.tgp || t.t3_t4_tsh) && (
-                          <div className="flex flex-wrap gap-1.5 text-xs pt-1 border-t border-slate-100">
-                            {t.hb && <span className="bg-rose-50 text-rose-900 border border-rose-200 px-2 py-0.5 rounded-md font-bold">HB: {t.hb}</span>}
-                            {t.glucosa && <span className="bg-amber-50 text-amber-900 border border-amber-200 px-2 py-0.5 rounded-md font-bold">Glucosa: {t.glucosa}</span>}
-                            {t.agua_porcentaje && <span className="bg-blue-50 text-blue-900 border border-blue-200 px-2 py-0.5 rounded-md font-bold">Agua: {t.agua_porcentaje}</span>}
-                            {t.grasa_porcentaje && <span className="bg-rose-50 text-rose-900 border border-rose-200 px-2 py-0.5 rounded-md font-bold">Grasa: {t.grasa_porcentaje}</span>}
-                            {t.grasa_visceral && <span className="bg-rose-50 text-rose-900 border border-rose-200 px-2 py-0.5 rounded-md font-bold">Visceral: {t.grasa_visceral}</span>}
-                            {t.musculo_esqueletico_porcentaje && <span className="bg-indigo-50 text-indigo-900 border border-indigo-200 px-2 py-0.5 rounded-md font-bold">M.Esquel: {t.musculo_esqueletico_porcentaje}</span>}
-                            {t.musculos_porcentaje && <span className="bg-indigo-50 text-indigo-900 border border-indigo-200 px-2 py-0.5 rounded-md font-bold">Músculos: {t.musculos_porcentaje}</span>}
-                            {t.metabolismo && <span className="bg-cyan-50 text-cyan-900 border border-cyan-200 px-2 py-0.5 rounded-md font-bold">Metabolismo: {t.metabolismo}</span>}
-                            {t.proteina && <span className="bg-sky-50 text-sky-900 border border-sky-200 px-2 py-0.5 rounded-md font-bold">Proteína: {t.proteina}</span>}
-                            {t.edad_metabolica && <span className="bg-cyan-50 text-cyan-900 border border-cyan-200 px-2 py-0.5 rounded-md font-bold">E.Metabólica: {t.edad_metabolica}</span>}
-                            {t.circunferencia_abdominal && <span className="bg-teal-50 text-teal-900 border border-teal-200 px-2 py-0.5 rounded-md font-bold">Circunf: {t.circunferencia_abdominal}</span>}
-                            {t.globulos_rojos && <span className="bg-rose-50 text-rose-900 border border-rose-200 px-2 py-0.5 rounded-md font-bold">G.Rojos: {t.globulos_rojos}</span>}
-                            {t.globulos_blancos && <span className="bg-slate-100 text-slate-900 border border-slate-200 px-2 py-0.5 rounded-md font-bold">G.Blancos: {t.globulos_blancos}</span>}
-                            {t.hb_glicosilada && <span className="bg-amber-50 text-amber-900 border border-amber-200 px-2 py-0.5 rounded-md font-bold">Hb.Glic: {t.hb_glicosilada}</span>}
-                            {t.vcm && <span className="bg-purple-50 text-purple-900 border border-purple-200 px-2 py-0.5 rounded-md font-bold">VCM: {t.vcm}</span>}
-                            {t.colesterol && <span className="bg-purple-50 text-purple-900 border border-purple-200 px-2 py-0.5 rounded-md font-bold">Colesterol: {t.colesterol}</span>}
-                            {t.trigliceridos && <span className="bg-purple-50 text-purple-900 border border-purple-200 px-2 py-0.5 rounded-md font-bold">Triglicéridos: {t.trigliceridos}</span>}
-                            {t.creatinina && <span className="bg-amber-50 text-amber-900 border border-amber-200 px-2 py-0.5 rounded-md font-bold">Creatinina: {t.creatinina}</span>}
-                            {t.urea && <span className="bg-amber-50 text-amber-900 border border-amber-200 px-2 py-0.5 rounded-md font-bold">Urea: {t.urea}</span>}
-                            {t.tgo && <span className="bg-yellow-50 text-yellow-900 border border-yellow-200 px-2 py-0.5 rounded-md font-bold">TGO: {t.tgo}</span>}
-                            {t.tgp && <span className="bg-yellow-50 text-yellow-900 border border-yellow-200 px-2 py-0.5 rounded-md font-bold">TGP: {t.tgp}</span>}
-                            {t.t3_t4_tsh && <span className="bg-emerald-50 text-emerald-900 border border-emerald-200 px-2 py-0.5 rounded-md font-bold">TSH/T3/T4: {t.t3_t4_tsh}</span>}
-                            {t.antecedentes && <span className="bg-slate-100 text-slate-800 border border-slate-200 px-2 py-0.5 rounded-md font-bold">Antecedentes: {t.antecedentes}</span>}
-                          </div>
-                        )}
-                        <button type="button" onClick={(e) => { e.stopPropagation(); handleSeleccionarHistorial(t); setCarpetaAbierta(true); }} className="text-xs bg-teal-50 hover:bg-teal-100 text-teal-900 font-extrabold px-3 py-2 rounded-xl border border-teal-200 cursor-pointer">
-                          📁 Abrir carpeta de adjuntos
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setDniHistorial(t.dni_paciente); abrirDetalleTriaje(t); }} className="text-xs bg-teal-50 hover:bg-teal-100 text-teal-900 font-extrabold px-3 py-2 rounded-xl border border-teal-200 cursor-pointer">
+                          📁 Ver datos y adjuntos del último registro
                         </button>
                         {t.observaciones && (
-                          <div className="text-xs text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200 font-semibold">
+                          <div className="text-xs text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200 font-semibold line-clamp-2">
                             📝 <strong>Observaciones:</strong> {t.observaciones}
                           </div>
                         )}
@@ -1060,6 +998,61 @@ function EnfermeriaContent() {
             </div>
           </main>
         </div>
+        {dniHistorial && (
+          <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4 print:hidden" role="dialog" aria-modal="true" aria-label="Registros de triaje del paciente" onClick={() => { setDniHistorial(null); setDetalleTriaje(null); }}>
+            <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3 mb-4">
+                <div>
+                  <h3 className="m-0 text-base font-extrabold text-teal-900">📋 Registros de triaje</h3>
+                  <p className="m-0 text-xs text-slate-600">{registrosPaciente[0]?.nombre_paciente || 'Paciente'} · DNI {dniHistorial} · {registrosPaciente.length} {registrosPaciente.length === 1 ? 'registro' : 'registros'}</p>
+                </div>
+                <button type="button" onClick={() => { setDniHistorial(null); setDetalleTriaje(null); }} className="text-slate-700 font-bold cursor-pointer" aria-label="Cerrar registros">✕</button>
+              </div>
+              {detalleTriaje ? (
+                <div className="space-y-4">
+                  <button type="button" onClick={() => setDetalleTriaje(null)} className="text-xs font-bold text-teal-800 cursor-pointer">← Volver a todos los registros</button>
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="m-0 text-sm font-extrabold text-slate-900">Registro del {fechaTriaje(detalleTriaje)}</h4>
+                    <button type="button" onClick={e => ejecutarImpresionTriaje(detalleTriaje, e)} className="bg-slate-100 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer">🖨️ Imprimir</button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {CAMPOS_DETALLE.filter(({ campo }) => detalleTriaje[campo] !== null && detalleTriaje[campo] !== undefined && detalleTriaje[campo] !== '').map(({ campo, etiqueta }) => (
+                      <div key={campo} className="rounded-lg bg-slate-50 border border-slate-200 p-2 text-xs break-words">
+                        <span className="font-bold text-slate-600">{etiqueta}:</span> <span className="text-slate-900">{String(detalleTriaje[campo])}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-extrabold text-teal-900 mb-2">📁 Fotos y archivos de este registro ({adjuntosDetalle.length})</h4>
+                    {cargandoDetalle ? <p className="text-xs text-slate-500">Cargando adjuntos...</p> : adjuntosDetalle.length === 0 ? <p className="text-xs text-slate-500">Este registro no tiene adjuntos.</p> : (
+                      <div className="space-y-2">
+                        {adjuntosDetalle.map(item => <div key={item.id} className="flex items-center gap-2 p-2 border rounded-lg text-xs">
+                          <span className="truncate flex-1">{item.tipo.startsWith('image/') ? '🖼️' : '📄'} {item.nombre}</span>
+                          <button type="button" onClick={() => abrirAdjunto(`/api/triaje/adjuntos/${item.id}`, item.tipo)} className="font-bold text-teal-800 cursor-pointer">Abrir</button>
+                        </div>)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {registrosPaciente.map((registro, index) => <div key={registro.id} className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div>
+                      <p className="m-0 text-sm font-bold text-slate-900">{index === 0 ? 'Último registro' : `Registro anterior ${index}`} · {fechaTriaje(registro)}</p>
+                      <p className="m-0 text-xs text-slate-600">Peso: {registro.peso || '-'} kg · IMC: {registro.imc || '-'} · P/A: {registro.presion_arterial || '-'}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => abrirDetalleTriaje(registro)} className="bg-teal-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer">Ver datos y adjuntos</button>
+                      <button type="button" onClick={e => ejecutarImpresionTriaje(registro, e)} className="bg-slate-200 px-2 py-1.5 rounded-lg text-xs font-bold cursor-pointer">Imprimir</button>
+                      <button type="button" onClick={e => handleEliminarTriaje(registro.id, e)} className="bg-rose-50 text-rose-700 px-2 py-1.5 rounded-lg text-xs font-bold cursor-pointer">Eliminar</button>
+                    </div>
+                  </div>)}
+                  {registrosPaciente.length === 0 && <p className="text-sm text-slate-500">No hay registros para este paciente.</p>}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {carpetaAbierta && (
           <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4" onClick={() => setCarpetaAbierta(false)}>
             <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-auto p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
