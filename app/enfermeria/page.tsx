@@ -46,6 +46,8 @@ interface Triaje {
   archivo_adjunto?: string;
 }
 
+interface Adjunto { id: number; nombre: string; tipo: string; fecha: string }
+
 function EnfermeriaContent() {
   const searchParams = useSearchParams();
   const dniParam = searchParams.get('dni');
@@ -59,6 +61,10 @@ function EnfermeriaContent() {
   
   const [triajeImprimir, setTriajeImprimir] = useState<Triaje | null>(null);
   const [archivoModal, setArchivoModal] = useState<string | null>(null);
+  const [tipoArchivoModal, setTipoArchivoModal] = useState('');
+  const [carpetaAbierta, setCarpetaAbierta] = useState(false);
+  const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
+  const [pendientes, setPendientes] = useState<File[]>([]);
   const [camaraActiva, setCamaraActiva] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -170,8 +176,13 @@ function EnfermeriaContent() {
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const fotoDataUrl = canvas.toDataURL('image/jpeg');
-        setForm(prev => ({ ...prev, archivo_adjunto: fotoDataUrl }));
+        if (adjuntos.length + pendientes.length >= 30) {
+          alert('Se permiten hasta 30 adjuntos por triaje.');
+        } else {
+          canvas.toBlob(blob => {
+            if (blob) setPendientes(prev => [...prev, new File([blob], `foto-${Date.now()}.jpg`, { type: 'image/jpeg' })]);
+          }, 'image/jpeg', 0.85);
+        }
       }
     }
     cerrarCamara();
@@ -249,6 +260,8 @@ function EnfermeriaContent() {
   const handleSelectPaciente = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const dniElegido = e.target.value;
     if (!dniElegido) {
+      setAdjuntos([]);
+      setPendientes([]);
       setForm(prev => ({
         ...prev,
         dni_paciente: '', nombre_paciente: '', edad: '', talla: '', peso: '', imc: '',
@@ -266,6 +279,8 @@ function EnfermeriaContent() {
     if (triajeExistente) {
       handleSeleccionarHistorial(triajeExistente);
     } else {
+      setAdjuntos([]);
+      setPendientes([]);
       const paciente = pacientesRegistrados.find(p => (p.dni === dniElegido || p.dni_paciente === dniElegido));
       if (paciente) {
         const nombre = paciente.nombre || paciente.nombre_paciente || '';
@@ -282,17 +297,49 @@ function EnfermeriaContent() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setForm(prev => ({ ...prev, archivo_adjunto: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+    const files = Array.from(e.target.files || []);
+    if (adjuntos.length + pendientes.length + files.length > 30) alert('Se permiten hasta 30 adjuntos por triaje.');
+    else if (files.some(file => file.size > 3 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'].includes(file.type))) {
+      alert('Solo imágenes JPG, PNG, WebP, GIF o PDF de hasta 3 MB por archivo.');
+    } else setPendientes(prev => [...prev, ...files]);
+    e.target.value = '';
+  };
+
+  const cargarAdjuntos = async (id: string | number) => {
+    const res = await fetch(`/api/triaje/adjuntos?id=${id}`);
+    if (res.ok) setAdjuntos(await res.json());
+    else setAdjuntos([]);
+  };
+
+  const subirPendientes = async (id: string | number) => {
+    for (const archivo of pendientes) {
+      const data = new FormData();
+      data.append('triaje_id', String(id));
+      data.append('archivo', archivo);
+      const res = await fetch('/api/triaje/adjuntos', { method: 'POST', body: data });
+      if (!res.ok) throw new Error((await res.json()).error || `No se pudo subir ${archivo.name}`);
+      setPendientes(prev => prev.filter(file => file !== archivo));
     }
+    await cargarAdjuntos(id);
+  };
+
+  const abrirAdjunto = (url: string, tipo: string) => {
+    setTipoArchivoModal(tipo);
+    setArchivoModal(url);
+  };
+
+  const eliminarAdjunto = async (id: number) => {
+    if (!confirm('¿Eliminar este adjunto guardado?')) return;
+    const res = await fetch(`/api/triaje/adjuntos?id=${id}`, { method: 'DELETE' });
+    if (res.ok) setAdjuntos(prev => prev.filter(item => item.id !== id));
+    else alert('No se pudo eliminar el adjunto.');
   };
 
   const handleSeleccionarHistorial = (t: Triaje) => {
+    setPendientes([]);
+    setAdjuntos([]);
+    setCarpetaAbierta(false);
+    cargarAdjuntos(t.id);
     setForm({
       dni_paciente: t.dni_paciente || '',
       nombre_paciente: t.nombre_paciente || '',
@@ -375,6 +422,7 @@ function EnfermeriaContent() {
           body: JSON.stringify(triajeActualizado)
         });
         if (!response.ok) throw new Error((await response.json()).error || 'No se pudo guardar el triaje');
+        await subirPendientes(idExistente);
         setTriajes(triajesCopia);
         alert('📋 Triaje del paciente actualizado exitosamente.');
       } else {
@@ -389,11 +437,14 @@ function EnfermeriaContent() {
           body: JSON.stringify(nuevoTriaje)
         });
         if (!res.ok) throw new Error((await res.json()).error || 'No se pudo guardar el triaje');
+        const creado = await res.json();
+        await subirPendientes(creado.data.id);
         await fetchTriajes();
         alert('📋 Nuevo triaje clínico registrado exitosamente.');
       }
     } catch (err) {
       console.error('Error guardando triaje:', err);
+      await fetchTriajes();
       alert(err instanceof Error ? err.message : 'No se pudo guardar el triaje');
     } finally {
       setSaving(false);
@@ -475,12 +526,6 @@ function EnfermeriaContent() {
             {triajeImprimir.observaciones && (
               <div className="mb-4 text-xs p-2 border rounded bg-slate-50">
                 <strong>Observaciones:</strong> {triajeImprimir.observaciones}
-              </div>
-            )}
-            {triajeImprimir.archivo_adjunto && triajeImprimir.archivo_adjunto.startsWith('data:image/') && (
-              <div className="mt-4 text-center">
-                <h4 className="text-xs font-extrabold uppercase text-teal-900 border-b pb-1 mb-2 text-left">FOTO / ADJUNTO CLÍNICO</h4>
-                <img src={triajeImprimir.archivo_adjunto} alt="Adjunto" className="max-h-48 mx-auto rounded border" />
               </div>
             )}
           </div>
@@ -822,7 +867,7 @@ function EnfermeriaContent() {
                 )}
                 <div className="bg-teal-50/50 p-3.5 rounded-xl border border-teal-200">
                   <label className="block text-[11px] font-extrabold text-teal-900 mb-2 uppercase tracking-wider">
-                    📷 ADJUNTAR ARCHIVO O TOMAR FOTO
+                    📁 FOTOS Y ARCHIVOS DEL TRIAJE
                   </label>
                   
                   <div className="flex flex-col sm:flex-row items-center gap-2">
@@ -836,6 +881,7 @@ function EnfermeriaContent() {
                     <input
                       type="file"
                       accept="image/*,application/pdf"
+                      multiple
                       onChange={handleFileChange}
                       className="block w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-200 file:text-slate-800 hover:file:bg-slate-300 cursor-pointer"
                     />
@@ -862,27 +908,10 @@ function EnfermeriaContent() {
                       </div>
                     </div>
                   )}
-                  {form.archivo_adjunto && (
-                    <div className="mt-2.5 flex items-center justify-between bg-white p-2 rounded-xl border border-teal-300">
-                      <span className="text-xs font-bold text-slate-700 truncate max-w-[180px]">📎 Foto/Archivo listo</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setArchivoModal(form.archivo_adjunto)}
-                          className="text-xs bg-teal-100 hover:bg-teal-200 text-teal-900 font-extrabold px-2.5 py-1 rounded-lg cursor-pointer"
-                        >
-                          🔍 Ver ampliado
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setForm(prev => ({ ...prev, archivo_adjunto: '' }))}
-                          className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 font-extrabold px-2 py-1 rounded-lg cursor-pointer"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <p className="mt-2 text-xs text-slate-600">Hasta 30 fotos o archivos PDF, 3 MB cada uno. Se guardan al guardar el triaje.</p>
+                  <button type="button" onClick={() => setCarpetaAbierta(true)} className="mt-2 w-full bg-white border border-teal-300 rounded-xl p-3 text-left text-sm font-bold text-teal-900 hover:bg-teal-50 cursor-pointer">
+                    📁 Abrir carpeta de adjuntos ({adjuntos.length + pendientes.length}/30)
+                  </button>
                 </div>
                 <div>
                   <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase">
@@ -1017,21 +1046,9 @@ function EnfermeriaContent() {
                             {t.antecedentes && <span className="bg-slate-100 text-slate-800 border border-slate-200 px-2 py-0.5 rounded-md font-bold">Antecedentes: {t.antecedentes}</span>}
                           </div>
                         )}
-                        {t.archivo_adjunto && (
-                          <div className="flex items-center justify-between bg-teal-50 p-2 rounded-xl border border-teal-200 mt-1">
-                            <span className="text-xs font-bold text-teal-900">📎 Foto/Archivo guardado</span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setArchivoModal(t.archivo_adjunto || null);
-                              }}
-                              className="text-xs bg-teal-700 hover:bg-teal-800 text-white font-extrabold px-2.5 py-1 rounded-lg cursor-pointer"
-                            >
-                              🔍 Ver ampliado
-                            </button>
-                          </div>
-                        )}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); handleSeleccionarHistorial(t); setCarpetaAbierta(true); }} className="text-xs bg-teal-50 hover:bg-teal-100 text-teal-900 font-extrabold px-3 py-2 rounded-xl border border-teal-200 cursor-pointer">
+                          📁 Abrir carpeta de adjuntos
+                        </button>
                         {t.observaciones && (
                           <div className="text-xs text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200 font-semibold">
                             📝 <strong>Observaciones:</strong> {t.observaciones}
@@ -1045,6 +1062,26 @@ function EnfermeriaContent() {
             </div>
           </main>
         </div>
+        {carpetaAbierta && (
+          <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4" onClick={() => setCarpetaAbierta(false)}>
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-auto p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4"><h3 className="font-extrabold text-teal-900">📁 Adjuntos del triaje ({adjuntos.length + pendientes.length}/30)</h3><button type="button" onClick={() => setCarpetaAbierta(false)}>✕</button></div>
+              {adjuntos.length + pendientes.length === 0 && <p className="text-sm text-slate-500">Esta carpeta está vacía.</p>}
+              <div className="space-y-2">
+                {adjuntos.map(item => <div key={item.id} className="flex items-center gap-2 p-2 border rounded-lg text-sm">
+                  <span className="truncate flex-1">{item.tipo.startsWith('image/') ? '🖼️' : '📄'} {item.nombre}</span>
+                  <button type="button" className="text-teal-800 font-bold" onClick={() => abrirAdjunto(`/api/triaje/adjuntos/${item.id}`, item.tipo)}>Abrir</button>
+                  <button type="button" className="text-rose-700 font-bold" onClick={() => eliminarAdjunto(item.id)}>Eliminar</button>
+                </div>)}
+                {pendientes.map((item, index) => <div key={`${item.name}-${index}`} className="flex items-center gap-2 p-2 border rounded-lg text-sm">
+                  <span className="truncate flex-1">{item.type.startsWith('image/') ? '🖼️' : '📄'} {item.name} · Pendiente de guardar</span>
+                  <button type="button" className="text-teal-800 font-bold" onClick={() => abrirAdjunto(URL.createObjectURL(item), item.type)}>Abrir</button>
+                  <button type="button" className="text-rose-700 font-bold" onClick={() => setPendientes(prev => prev.filter((_, i) => i !== index))}>Quitar</button>
+                </div>)}
+              </div>
+            </div>
+          </div>
+        )}
         {/* MODAL PARA VISUALIZAR Y CERRAR */}
         {archivoModal && (
           <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
@@ -1061,7 +1098,7 @@ function EnfermeriaContent() {
               </div>
               
               <div className="p-4 flex-1 overflow-auto flex items-center justify-center bg-slate-100">
-                {archivoModal.startsWith('data:image/') ? (
+                {tipoArchivoModal.startsWith('image/') ? (
                   <img src={archivoModal} alt="Archivo ampliado" className="max-h-[60vh] object-contain rounded-lg shadow-md" />
                 ) : (
                   <iframe src={archivoModal} className="w-full h-[60vh] rounded-lg border border-slate-300 bg-white" title="Documento adjunto" />
