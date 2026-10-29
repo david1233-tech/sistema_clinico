@@ -62,6 +62,14 @@ function RecepcionPageContent() {
             const resCons = await fetch(`/api/consulta?dni=${dniFinal}`);
             if (resCons.ok) {
               const consData = await resCons.json();
+              if (consData.length > 0 && !consData[0].imagen_url) {
+                const resAdjuntos = await fetch(`/api/consulta/adjuntos?id=${consData[0].id}`);
+                if (resAdjuntos.ok) {
+                  const adjuntos = await resAdjuntos.json();
+                  const primeraImagen = adjuntos.find((item: { tipo: string }) => item.tipo.startsWith('image/'));
+                  if (primeraImagen) consData[0].imagen_url = `/api/consulta/adjuntos/${primeraImagen.id}`;
+                }
+              }
               setConsultas(consData);
               if (consData.length > 0) {
                 setConsultaImprimir(consData[0]);

@@ -38,6 +38,7 @@ interface ConsultaGuardada {
   dieta?: string;
   imagen_url?: string;
 }
+interface AdjuntoConsulta { id: number; nombre: string; tipo: string; fecha: string }
 const DIETAS_VITAL_SALUD = [
   {
     nombre: '🚫 DIABETES',
@@ -464,6 +465,13 @@ function ConsultorioPageContent() {
   
   // Modal de visor con Zoom
   const [imagenModal, setImagenModal] = useState<string | null>(null);
+  const [tipoModal, setTipoModal] = useState('image/jpeg');
+  const [carpetaAbierta, setCarpetaAbierta] = useState(false);
+  const [carpetaConsulta, setCarpetaConsulta] = useState<ConsultaGuardada | null>(null);
+  const [adjuntosCarpeta, setAdjuntosCarpeta] = useState<AdjuntoConsulta[]>([]);
+  const [archivosPendientes, setArchivosPendientes] = useState<File[]>([]);
+  const [consultaPendienteId, setConsultaPendienteId] = useState<string | number | null>(null);
+  const [cargandoCarpeta, setCargandoCarpeta] = useState(false);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   
   const [consulta, setConsulta] = useState({
@@ -603,6 +611,9 @@ function ConsultorioPageContent() {
   };
 
   const handleSeleccionarPaciente = (p: PacienteEnEspera) => {
+    setArchivosPendientes([]);
+    setConsultaPendienteId(null);
+    setCarpetaAbierta(false);
     setPacienteSeleccionado(p);
     const dni = p.dni_paciente || p.dni || '';
     cargarHistorialPaciente(dni);
@@ -624,28 +635,95 @@ function ConsultorioPageContent() {
   };
 
   const handleImagenUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setConsulta(prev => ({ ...prev, imagen_url: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+    const files = Array.from(e.target.files || []);
+    if (archivosPendientes.length + files.length > 50) alert('Se permiten hasta 50 adjuntos por consulta.');
+    else if (files.some(file => file.size === 0 || file.size > 3 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'].includes(file.type))) {
+      alert('Solo imágenes JPG, PNG, WebP, GIF o PDF de hasta 3 MB por archivo.');
+    } else setArchivosPendientes(prev => [...prev, ...files]);
+    e.target.value = '';
+  };
+
+  const cargarAdjuntosConsulta = async (id: string | number) => {
+    const res = await fetch(`/api/consulta/adjuntos?id=${id}`);
+    if (!res.ok) throw new Error((await res.json()).error || 'No se pudieron cargar los adjuntos');
+    const items: AdjuntoConsulta[] = await res.json();
+    setAdjuntosCarpeta(items);
+    return items;
+  };
+
+  const abrirCarpeta = async (item: ConsultaGuardada | null) => {
+    setCarpetaConsulta(item);
+    setAdjuntosCarpeta([]);
+    setCarpetaAbierta(true);
+    if (item) {
+      setCargandoCarpeta(true);
+      try { await cargarAdjuntosConsulta(item.id); }
+      catch (error) { alert(error instanceof Error ? error.message : 'No se pudo abrir la carpeta'); }
+      finally { setCargandoCarpeta(false); }
     }
+  };
+
+  const subirArchivoConsulta = async (id: string | number, archivo: File) => {
+    const data = new FormData();
+    data.append('consulta_id', String(id));
+    data.append('archivo', archivo);
+    const res = await fetch('/api/consulta/adjuntos', { method: 'POST', body: data });
+    if (!res.ok) throw new Error((await res.json()).error || `No se pudo subir ${archivo.name}`);
+  };
+
+  const handleAgregarHistorial = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!carpetaConsulta || files.length === 0) return;
+    if (adjuntosCarpeta.length + files.length > 50) { alert('Se permiten hasta 50 adjuntos por consulta.'); return; }
+    if (files.some(file => file.size === 0 || file.size > 3 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'].includes(file.type))) {
+      alert('Solo imágenes JPG, PNG, WebP, GIF o PDF de hasta 3 MB por archivo.'); return;
+    }
+    setCargandoCarpeta(true);
+    try {
+      for (const file of files) await subirArchivoConsulta(carpetaConsulta.id, file);
+      await cargarAdjuntosConsulta(carpetaConsulta.id);
+    } catch (error) {
+      try { await cargarAdjuntosConsulta(carpetaConsulta.id); } catch { /* conservar el error de subida */ }
+      alert(error instanceof Error ? error.message : 'No se pudieron subir todos los archivos');
+    } finally { setCargandoCarpeta(false); }
+  };
+
+  const eliminarAdjuntoConsulta = async (id: number) => {
+    if (!confirm('¿Eliminar este adjunto?')) return;
+    const res = await fetch(`/api/consulta/adjuntos?id=${id}`, { method: 'DELETE' });
+    if (res.ok) setAdjuntosCarpeta(prev => prev.filter(item => item.id !== id));
+    else alert('No se pudo eliminar el adjunto.');
   };
 
   const abrirVisorZoom = (url: string) => {
     setImagenModal(url);
+    setTipoModal('image/jpeg');
     setZoomLevel(1);
   };
 
+  const abrirArchivo = (url: string, tipo: string) => {
+    setImagenModal(url);
+    setTipoModal(tipo);
+    setZoomLevel(1);
+  };
+
+  const cerrarVisor = () => {
+    if (imagenModal?.startsWith('blob:')) URL.revokeObjectURL(imagenModal);
+    setImagenModal(null);
+  };
+
   const handleLimpiarCampos = () => {
-    if (consulta.motivo || consulta.diagnostico || consulta.receta || consulta.dieta || consulta.imagen_url) {
+    if (consulta.motivo || consulta.diagnostico || consulta.receta || consulta.dieta || archivosPendientes.length) {
       if (confirm('¿Estás seguro de que deseas borrar los datos ingresados en esta consulta?')) {
         setConsulta({ motivo: '', diagnostico: '', receta: '', dieta: '', imagen_url: '' });
+        setArchivosPendientes([]);
+        setConsultaPendienteId(null);
       }
     } else {
       setConsulta({ motivo: '', diagnostico: '', receta: '', dieta: '', imagen_url: '' });
+      setArchivosPendientes([]);
+      setConsultaPendienteId(null);
     }
   };
 
@@ -666,17 +744,29 @@ function ConsultorioPageContent() {
         diagnostico: consulta.diagnostico,
         receta: consulta.receta,
         dieta: consulta.dieta,
-        imagen_url: consulta.imagen_url
+        imagen_url: ''
       };
-      const response = await fetch('/api/consulta', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nuevaConsulta)
-      });
-      if (!response.ok) throw new Error((await response.json()).error || 'No se pudo guardar la consulta');
+      let id = consultaPendienteId;
+      if (!id) {
+        const response = await fetch('/api/consulta', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(nuevaConsulta)
+        });
+        if (!response.ok) throw new Error((await response.json()).error || 'No se pudo guardar la consulta');
+        id = (await response.json()).id;
+        setConsultaPendienteId(id);
+      }
+      if (id === null) throw new Error('No se recibió el identificador de la consulta');
+      for (const archivo of archivosPendientes) {
+        await subirArchivoConsulta(id, archivo);
+        setArchivosPendientes(prev => prev.filter(item => item !== archivo));
+      }
       await cargarHistorialPaciente(dni);
       alert(`✅ Consulta y dieta guardadas con éxito para ${pacienteSeleccionado.nombre_paciente || dni}`);
       setConsulta({ motivo: '', diagnostico: '', receta: '', dieta: '', imagen_url: '' });
+      setArchivosPendientes([]);
+      setConsultaPendienteId(null);
     } catch (err) {
       console.error('Error guardando consulta:', err);
       alert(err instanceof Error ? err.message : 'No se pudo guardar la consulta');
@@ -816,23 +906,9 @@ function ConsultorioPageContent() {
                                 {h.diagnostico && <p className="m-0"><strong>Diagnóstico:</strong> {h.diagnostico}</p>}
                                 {h.receta && <p className="m-0 text-teal-800"><strong>Receta:</strong> {h.receta}</p>}
                                 {h.dieta && <p className="m-0 text-purple-800 whitespace-pre-line"><strong>Dieta:</strong> {h.dieta}</p>}
-                                {h.imagen_url && (
-                                  <div className="mt-1 flex items-center gap-2">
-                                    <img
-                                      src={h.imagen_url}
-                                      alt="Examen adjunto"
-                                      onClick={() => abrirVisorZoom(h.imagen_url!)}
-                                      className="w-20 h-20 object-cover rounded-lg border border-slate-300 cursor-pointer hover:opacity-80 transition-all shadow-sm"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => abrirVisorZoom(h.imagen_url!)}
-                                      className="px-2.5 py-1 bg-sky-100 text-sky-800 rounded-md font-bold text-[11px] cursor-pointer hover:bg-sky-200"
-                                    >
-                                      🔍 Ampliar
-                                    </button>
-                                  </div>
-                                )}
+                                <button type="button" onClick={() => abrirCarpeta(h)} className="mt-1 px-2.5 py-1.5 bg-teal-50 text-teal-800 border border-teal-200 rounded-lg font-bold text-[11px] cursor-pointer hover:bg-teal-100 text-left w-fit">
+                                  📁 Abrir carpeta de fotos y exámenes
+                                </button>
                               </div>
                             ))}
                           </div>
@@ -914,54 +990,22 @@ function ConsultorioPageContent() {
                         className="w-full p-3 rounded-xl border border-purple-300 bg-white font-medium text-slate-900 text-xs md:text-sm outline-none focus:border-purple-600 shadow-sm font-mono whitespace-pre-wrap"
                       />
                     </div>
-                    {/* ADJUNTAR FOTO O EXAMEN CON PREVISUALIZACIÓN Y ZOOM */}
+                    {/* ADJUNTAR FOTO O EXAMEN */}
                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col gap-3">
                       <label className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
-                        🖼️ ADJUNTAR FOTO O EXAMEN CLÍNICO AL EXPEDIENTE
+                        📁 FOTOS Y EXÁMENES CLÍNICOS DE ESTA CONSULTA
                       </label>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                        multiple
                         onChange={handleImagenUpload}
                         className="text-xs font-bold text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer"
                       />
-                      {consulta.imagen_url && (
-                        <div className="mt-2 p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-4 flex-wrap">
-                          <div className="flex items-center gap-3">
-                            <div
-                              onClick={() => abrirVisorZoom(consulta.imagen_url)}
-                              className="relative group cursor-pointer overflow-hidden rounded-xl border-2 border-teal-500 shadow-sm"
-                              title="Haz clic para ampliar con zoom"
-                            >
-                              <img
-                                src={consulta.imagen_url}
-                                alt="Vista previa del examen"
-                                className="w-24 h-24 object-cover group-hover:scale-105 transition-transform duration-200"
-                              />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
-                                🔍 Zoom
-                              </div>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <span className="text-xs font-extrabold text-slate-800">Imagen Adjunta Lista</span>
-                              <button
-                                type="button"
-                                onClick={() => abrirVisorZoom(consulta.imagen_url)}
-                                className="px-3 py-1 bg-sky-50 text-sky-700 border border-sky-200 rounded-lg text-xs font-bold cursor-pointer hover:bg-sky-100 text-left w-fit"
-                              >
-                                🔍 Ver en Pantalla Completa & Zoom
-                              </button>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setConsulta(prev => ({ ...prev, imagen_url: '' }))}
-                            className="bg-rose-50 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer hover:bg-rose-100 transition-all"
-                          >
-                            Eliminar foto
-                          </button>
-                        </div>
-                      )}
+                      <p className="m-0 text-xs text-slate-600">Hasta 50 imágenes o PDF de 3 MB cada uno. Se guardan con la consulta.</p>
+                      <button type="button" onClick={() => abrirCarpeta(null)} className="bg-white border border-teal-200 rounded-xl p-3 text-left text-sm font-bold text-teal-900 hover:bg-teal-50 cursor-pointer">
+                        📁 Abrir carpeta de adjuntos ({archivosPendientes.length}/50)
+                      </button>
                     </div>
                     {/* BOTONES */}
                     <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
@@ -993,6 +1037,38 @@ function ConsultorioPageContent() {
           </div>
         </main>
       </div>
+      {carpetaAbierta && (
+        <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4" onClick={() => setCarpetaAbierta(false)}>
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-auto p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-extrabold text-teal-900">📁 {carpetaConsulta ? `Adjuntos de la consulta · ${carpetaConsulta.fecha}` : 'Adjuntos para la nueva consulta'}</h3>
+              <button type="button" onClick={() => setCarpetaAbierta(false)} className="font-bold text-slate-700">✕</button>
+            </div>
+            {carpetaConsulta && <div className="mb-3">
+              <label className="block text-xs font-bold text-teal-800 mb-1">Agregar fotos o PDF a esta consulta ({adjuntosCarpeta.length}/50)</label>
+              <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={handleAgregarHistorial} disabled={cargandoCarpeta} className="text-xs max-w-full" />
+            </div>}
+            {cargandoCarpeta && <p className="text-xs text-slate-500">Cargando archivos...</p>}
+            {!cargandoCarpeta && adjuntosCarpeta.length + (carpetaConsulta ? 0 : archivosPendientes.length) + (carpetaConsulta?.imagen_url ? 1 : 0) === 0 && <p className="text-sm text-slate-500">Esta carpeta está vacía.</p>}
+            <div className="space-y-2">
+              {carpetaConsulta?.imagen_url && <div className="flex items-center gap-2 p-2 border rounded-lg text-sm">
+                <span className="truncate flex-1">🖼️ Imagen anterior de la consulta</span>
+                <button type="button" className="text-teal-800 font-bold" onClick={() => abrirVisorZoom(carpetaConsulta.imagen_url!)}>Abrir</button>
+              </div>}
+              {adjuntosCarpeta.map(item => <div key={item.id} className="flex items-center gap-2 p-2 border rounded-lg text-sm">
+                <span className="truncate flex-1">{item.tipo.startsWith('image/') ? '🖼️' : '📄'} {item.nombre}</span>
+                <button type="button" className="text-teal-800 font-bold" onClick={() => abrirArchivo(`/api/consulta/adjuntos/${item.id}`, item.tipo)}>Abrir</button>
+                <button type="button" className="text-rose-700 font-bold" onClick={() => eliminarAdjuntoConsulta(item.id)}>Eliminar</button>
+              </div>)}
+              {!carpetaConsulta && archivosPendientes.map((item, index) => <div key={`${item.name}-${index}`} className="flex items-center gap-2 p-2 border rounded-lg text-sm">
+                <span className="truncate flex-1">{item.type.startsWith('image/') ? '🖼️' : '📄'} {item.name} · Pendiente de guardar</span>
+                <button type="button" className="text-teal-800 font-bold" onClick={() => abrirArchivo(URL.createObjectURL(item), item.type)}>Abrir</button>
+                <button type="button" className="text-rose-700 font-bold" onClick={() => setArchivosPendientes(prev => prev.filter((_, i) => i !== index))}>Quitar</button>
+              </div>)}
+            </div>
+          </div>
+        </div>
+      )}
       {/* MODAL CON ZOOM Y CONTROL INTERACTIVO */}
       {imagenModal && (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-50 flex flex-col items-center justify-between p-4 sm:p-6 animate-fadeIn">
@@ -1001,35 +1077,35 @@ function ConsultorioPageContent() {
               🔬 Visor de Examen Clínico / Imagen
             </span>
             <div className="flex items-center gap-2">
-              <button
+              {tipoModal.startsWith('image/') && <button
                 type="button"
                 onClick={() => setZoomLevel(prev => Math.max(0.5, prev - 0.25))}
                 className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-xl font-black text-sm border border-slate-600 cursor-pointer"
                 title="Alejar (-)"
               >
                 ➖
-              </button>
-              <span className="text-xs font-mono font-bold px-2 py-1 bg-slate-900 rounded-lg border border-slate-700">
+              </button>}
+              {tipoModal.startsWith('image/') && <span className="text-xs font-mono font-bold px-2 py-1 bg-slate-900 rounded-lg border border-slate-700">
                 {Math.round(zoomLevel * 100)}%
-              </span>
-              <button
+              </span>}
+              {tipoModal.startsWith('image/') && <button
                 type="button"
                 onClick={() => setZoomLevel(prev => Math.min(3, prev + 0.25))}
                 className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-xl font-black text-sm border border-slate-600 cursor-pointer"
                 title="Acercar (+)"
               >
                 ➕
-              </button>
-              <button
+              </button>}
+              {tipoModal.startsWith('image/') && <button
                 type="button"
                 onClick={() => setZoomLevel(1)}
                 className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-xl font-bold text-xs border border-slate-600 cursor-pointer ml-2"
               >
                 Restablecer
-              </button>
+              </button>}
               <button
                 type="button"
-                onClick={() => setImagenModal(null)}
+                onClick={cerrarVisor}
                 className="bg-rose-600 hover:bg-rose-700 text-white w-8 h-8 rounded-xl font-black text-sm cursor-pointer border border-rose-500 ml-3 flex items-center justify-center"
                 title="Cerrar"
               >
@@ -1038,16 +1114,16 @@ function ConsultorioPageContent() {
             </div>
           </div>
           <div className="w-full max-w-5xl flex-1 my-4 flex items-center justify-center overflow-auto rounded-2xl bg-slate-950/50 border border-slate-800 p-4">
-            <div className="transition-transform duration-200 ease-out flex items-center justify-center" style={{ transform: `scale(${zoomLevel})` }}>
+            {tipoModal === 'application/pdf' ? <iframe src={imagenModal} title="Examen clínico PDF" className="w-full h-[70vh] bg-white rounded-lg" /> : <div className="transition-transform duration-200 ease-out flex items-center justify-center" style={{ transform: `scale(${zoomLevel})` }}>
               <img
                 src={imagenModal}
                 alt="Examen clínico ampliado"
                 className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-2xl select-none"
               />
-            </div>
+            </div>}
           </div>
           <span className="text-slate-400 text-xs font-semibold">
-            Utiliza los botones superiores ➕ ➖ para acercar y alejar la imagen.
+            {tipoModal.startsWith('image/') ? 'Utiliza los botones superiores ➕ ➖ para acercar y alejar la imagen.' : 'Examen clínico en PDF.'}
           </span>
         </div>
       )}
