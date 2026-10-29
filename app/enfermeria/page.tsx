@@ -126,6 +126,7 @@ function EnfermeriaContent() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const detalleRequestRef = useRef(0);
   const [form, setForm] = useState(crearFormularioTriaje);
 
   useEffect(() => {
@@ -234,12 +235,9 @@ function EnfermeriaContent() {
       if (enc || triajeExistente) {
         const nombre = enc?.nombre || enc?.nombre_paciente || triajeExistente?.nombre_paciente || '';
         const edad = enc?.edad || triajeExistente?.edad;
-        setForm(prev => ({
-          ...prev,
-          dni_paciente: dni,
-          nombre_paciente: nombre || prev.nombre_paciente,
-          edad: edad ? String(edad) : prev.edad
-        }));
+        setForm(prev => prev.dni_paciente === dni
+          ? { ...prev, nombre_paciente: nombre || prev.nombre_paciente, edad: edad ? String(edad) : prev.edad }
+          : crearFormularioTriaje(dni, nombre, edad ? String(edad) : ''));
       } else {
         const res = await fetch('/api/pacientes');
         if (res.ok) {
@@ -247,12 +245,9 @@ function EnfermeriaContent() {
           if (Array.isArray(todos)) {
             const encontrado = todos.find(p => (p.dni || p.dni_paciente) === dni);
             if (encontrado) {
-              setForm(prev => ({
-                ...prev,
-                dni_paciente: dni,
-                nombre_paciente: encontrado.nombre || encontrado.nombre_paciente || prev.nombre_paciente,
-                edad: encontrado.edad ? String(encontrado.edad) : prev.edad
-              }));
+              setForm(prev => prev.dni_paciente === dni
+                ? { ...prev, nombre_paciente: encontrado.nombre || encontrado.nombre_paciente || prev.nombre_paciente, edad: encontrado.edad ? String(encontrado.edad) : prev.edad }
+                : crearFormularioTriaje(dni, encontrado.nombre || encontrado.nombre_paciente || '', encontrado.edad ? String(encontrado.edad) : ''));
             }
           }
         }
@@ -332,18 +327,30 @@ function EnfermeriaContent() {
   };
 
   const abrirDetalleTriaje = async (t: Triaje) => {
+    const solicitud = ++detalleRequestRef.current;
     setDetalleTriaje(t);
     setAdjuntosDetalle([]);
     setCargandoDetalle(true);
     try {
       const res = await fetch(`/api/triaje/adjuntos?id=${t.id}`);
       if (!res.ok) throw new Error('No se pudieron cargar los adjuntos del registro');
-      setAdjuntosDetalle(await res.json());
+      const items = await res.json();
+      if (solicitud === detalleRequestRef.current) setAdjuntosDetalle(items);
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'No se pudieron cargar los adjuntos');
+      if (solicitud === detalleRequestRef.current) alert(error instanceof Error ? error.message : 'No se pudieron cargar los adjuntos');
     } finally {
-      setCargandoDetalle(false);
+      if (solicitud === detalleRequestRef.current) setCargandoDetalle(false);
     }
+  };
+
+  const volverARegistros = () => {
+    detalleRequestRef.current += 1;
+    setDetalleTriaje(null);
+  };
+
+  const cerrarRegistros = () => {
+    volverARegistros();
+    setDniHistorial(null);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -407,7 +414,7 @@ function EnfermeriaContent() {
         const response = await fetch(`/api/triaje?id=${id}`, { method: 'DELETE' });
         if (!response.ok) throw new Error((await response.json()).error || 'No se pudo eliminar el triaje');
         setTriajes(prev => prev.filter(t => t.id !== id));
-        if (detalleTriaje?.id === id) setDetalleTriaje(null);
+        if (detalleTriaje?.id === id) volverARegistros();
       } catch (err) {
         alert(err instanceof Error ? err.message : 'No se pudo eliminar el triaje');
       }
@@ -926,7 +933,7 @@ function EnfermeriaContent() {
                     return (
                       <div
                         key={t.id || idx}
-                        onClick={() => { setDniHistorial(t.dni_paciente); setDetalleTriaje(null); }}
+                        onClick={() => { setDniHistorial(t.dni_paciente); volverARegistros(); }}
                         className={`bg-white rounded-2xl border p-4 flex flex-col gap-2.5 shadow-sm cursor-pointer transition-all ${
                           isSelected 
                             ? 'border-teal-500 bg-teal-50/40 ring-2 ring-teal-500/20' 
@@ -949,7 +956,7 @@ function EnfermeriaContent() {
                             </span>
                             <button
                               type="button"
-                              onClick={() => { setDniHistorial(t.dni_paciente); setDetalleTriaje(null); }}
+                              onClick={() => { setDniHistorial(t.dni_paciente); volverARegistros(); }}
                               className="bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 px-2.5 py-1 rounded-lg text-xs font-extrabold cursor-pointer"
                             >
                               📋 Ver registros ({registros.length})
@@ -999,18 +1006,18 @@ function EnfermeriaContent() {
           </main>
         </div>
         {dniHistorial && (
-          <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4 print:hidden" role="dialog" aria-modal="true" aria-label="Registros de triaje del paciente" onClick={() => { setDniHistorial(null); setDetalleTriaje(null); }}>
+          <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4 print:hidden" role="dialog" aria-modal="true" aria-label="Registros de triaje del paciente" onClick={cerrarRegistros}>
             <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
               <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3 mb-4">
                 <div>
                   <h3 className="m-0 text-base font-extrabold text-teal-900">📋 Registros de triaje</h3>
                   <p className="m-0 text-xs text-slate-600">{registrosPaciente[0]?.nombre_paciente || 'Paciente'} · DNI {dniHistorial} · {registrosPaciente.length} {registrosPaciente.length === 1 ? 'registro' : 'registros'}</p>
                 </div>
-                <button type="button" onClick={() => { setDniHistorial(null); setDetalleTriaje(null); }} className="text-slate-700 font-bold cursor-pointer" aria-label="Cerrar registros">✕</button>
+                <button type="button" onClick={cerrarRegistros} className="text-slate-700 font-bold cursor-pointer" aria-label="Cerrar registros">✕</button>
               </div>
               {detalleTriaje ? (
                 <div className="space-y-4">
-                  <button type="button" onClick={() => setDetalleTriaje(null)} className="text-xs font-bold text-teal-800 cursor-pointer">← Volver a todos los registros</button>
+                  <button type="button" onClick={volverARegistros} className="text-xs font-bold text-teal-800 cursor-pointer">← Volver a todos los registros</button>
                   <div className="flex items-center justify-between gap-2">
                     <h4 className="m-0 text-sm font-extrabold text-slate-900">Registro del {fechaTriaje(detalleTriaje)}</h4>
                     <button type="button" onClick={e => ejecutarImpresionTriaje(detalleTriaje, e)} className="bg-slate-100 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer">🖨️ Imprimir</button>
