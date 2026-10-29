@@ -92,6 +92,15 @@ function crearFormularioTriaje(dni_paciente = '', nombre_paciente = '', edad = '
   };
 }
 
+function formularioDesdeRegistro(registro: Triaje) {
+  const formulario = crearFormularioTriaje();
+  for (const campo of Object.keys(formulario) as (keyof typeof formulario)[]) {
+    const valor = registro[campo];
+    formulario[campo] = valor === null || valor === undefined ? '' : String(valor);
+  }
+  return formulario;
+}
+
 function fechaTriaje(t: Triaje) {
   const fecha = t.fecha || t.fecha_hora;
   if (!fecha) return `Registro #${t.id}`;
@@ -114,6 +123,7 @@ function EnfermeriaContent() {
   const [adjuntosDetalle, setAdjuntosDetalle] = useState<Adjunto[]>([]);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
   const [registroPendienteId, setRegistroPendienteId] = useState<string | number | null>(null);
+  const [registroEditando, setRegistroEditando] = useState<Triaje | null>(null);
   
   const [triajeImprimir, setTriajeImprimir] = useState<Triaje | null>(null);
   const [archivoModal, setArchivoModal] = useState<string | null>(null);
@@ -127,6 +137,7 @@ function EnfermeriaContent() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const detalleRequestRef = useRef(0);
+  const adjuntosRequestRef = useRef(0);
   const [form, setForm] = useState(crearFormularioTriaje);
 
   useEffect(() => {
@@ -227,6 +238,7 @@ function EnfermeriaContent() {
   };
 
   const cargarDatosPacientePorDni = async (dni: string) => {
+    if (registroEditando) return;
     if (!/^\d{8}$/.test(dni)) return;
     try {
       setBuscandoDni(true);
@@ -260,9 +272,10 @@ function EnfermeriaContent() {
   };
 
   const handleSelectPaciente = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    if (registroPendienteId) return;
+    if (registroPendienteId || registroEditando) return;
     const dniElegido = e.target.value;
     if (!dniElegido) {
+      adjuntosRequestRef.current += 1;
       setAdjuntos([]);
       setPendientes([]);
       setRegistroPendienteId(null);
@@ -271,6 +284,7 @@ function EnfermeriaContent() {
     }
     const triajeExistente = triajes.find(t => t.dni_paciente === dniElegido);
     const paciente = pacientesRegistrados.find(p => (p.dni === dniElegido || p.dni_paciente === dniElegido));
+    adjuntosRequestRef.current += 1;
     setAdjuntos([]);
     setPendientes([]);
     setRegistroPendienteId(null);
@@ -293,9 +307,11 @@ function EnfermeriaContent() {
   };
 
   const cargarAdjuntos = async (id: string | number) => {
+    const solicitud = ++adjuntosRequestRef.current;
     const res = await fetch(`/api/triaje/adjuntos?id=${id}`);
-    if (res.ok) setAdjuntos(await res.json());
-    else setAdjuntos([]);
+    if (!res.ok) throw new Error('No se pudieron cargar los adjuntos del registro');
+    const items = await res.json();
+    if (solicitud === adjuntosRequestRef.current) setAdjuntos(items);
   };
 
   const subirPendientes = async (id: string | number) => {
@@ -353,11 +369,53 @@ function EnfermeriaContent() {
     setDniHistorial(null);
   };
 
+  const iniciarEdicion = async (registro: Triaje) => {
+    if (saving) return;
+    if (registroPendienteId) {
+      alert('Termine de subir los adjuntos pendientes antes de editar otro registro.');
+      return;
+    }
+    const hayDatosSinGuardar = pendientes.length > 0 || Object.entries(form).some(([campo, valor]) =>
+      !['dni_paciente', 'nombre_paciente', 'edad', 'archivo_adjunto'].includes(campo) && Boolean(valor)
+    );
+    if (hayDatosSinGuardar && !confirm('Los cambios que aún no guardó en el formulario se perderán. ¿Continuar?')) return;
+    cerrarRegistros();
+    setRegistroEditando(registro);
+    setRegistroPendienteId(null);
+    setForm(formularioDesdeRegistro(registro));
+    setPendientes([]);
+    setAdjuntos([]);
+    setCarpetaAbierta(false);
+    setMostrarOpcionales(true);
+    try { await cargarAdjuntos(registro.id); }
+    catch (error) { alert(error instanceof Error ? error.message : 'No se pudieron cargar los adjuntos'); }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelarEdicion = () => {
+    if (!registroEditando) return;
+    adjuntosRequestRef.current += 1;
+    setForm(crearFormularioTriaje(
+      registroEditando.dni_paciente,
+      registroEditando.nombre_paciente,
+      registroEditando.edad === null || registroEditando.edad === undefined ? '' : String(registroEditando.edad)
+    ));
+    setRegistroEditando(null);
+    setAdjuntos([]);
+    setPendientes([]);
+    setCarpetaAbierta(false);
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === 'dni_paciente') {
       if (registroPendienteId) return;
+      if (registroEditando) {
+        setForm(prev => ({ ...prev, dni_paciente: value }));
+        return;
+      }
       setForm(prev => prev.dni_paciente === value ? prev : crearFormularioTriaje(value));
+      adjuntosRequestRef.current += 1;
       setAdjuntos([]);
       setPendientes([]);
       setRegistroPendienteId(null);
@@ -377,8 +435,15 @@ function EnfermeriaContent() {
     }
     try {
       setSaving(true);
-      let id = registroPendienteId;
-      if (!id) {
+      let id = registroEditando?.id || registroPendienteId;
+      if (registroEditando) {
+        const res = await fetch('/api/triaje', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...form, id: registroEditando.id })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'No se pudo actualizar el registro');
+      } else if (!id) {
         const res = await fetch('/api/triaje', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -396,7 +461,8 @@ function EnfermeriaContent() {
       setAdjuntos([]);
       setPendientes([]);
       setRegistroPendienteId(null);
-      alert('📋 Nuevo registro de triaje guardado. Los registros anteriores se conservaron.');
+      setRegistroEditando(null);
+      alert(registroEditando ? '📋 Registro de triaje corregido. Los demás registros se conservaron.' : '📋 Nuevo registro de triaje guardado. Los registros anteriores se conservaron.');
     } catch (err) {
       console.error('Error guardando triaje:', err);
       await fetchTriajes();
@@ -415,6 +481,7 @@ function EnfermeriaContent() {
         if (!response.ok) throw new Error((await response.json()).error || 'No se pudo eliminar el triaje');
         setTriajes(prev => prev.filter(t => t.id !== id));
         if (detalleTriaje?.id === id) volverARegistros();
+        if (registroEditando?.id === id) cancelarEdicion();
       } catch (err) {
         alert(err instanceof Error ? err.message : 'No se pudo eliminar el triaje');
       }
@@ -518,8 +585,8 @@ function EnfermeriaContent() {
               <div className="bg-teal-700 p-4 text-white flex items-center gap-3">
                 <span className="text-2xl">🩺</span>
                 <div>
-                  <h3 className="m-0 text-sm md:text-base font-extrabold text-white">Nuevo Triaje Clínico</h3>
-                  <p className="m-0 text-xs text-teal-100">Los campos con (*) son obligatorios</p>
+                  <h3 className="m-0 text-sm md:text-base font-extrabold text-white">{registroEditando ? `Editando registro del ${fechaTriaje(registroEditando)}` : 'Nuevo Triaje Clínico'}</h3>
+                  <p className="m-0 text-xs text-teal-100">{registroEditando ? `Registro #${registroEditando.id} · Los demás registros se conservarán` : 'Los campos con (*) son obligatorios'}</p>
                 </div>
               </div>
               
@@ -531,7 +598,7 @@ function EnfermeriaContent() {
                   <select
                     onChange={handleSelectPaciente}
                     value={form.dni_paciente}
-                    disabled={saving || Boolean(registroPendienteId)}
+                    disabled={saving || Boolean(registroPendienteId) || Boolean(registroEditando)}
                     className="w-full p-2.5 rounded-xl border border-teal-300 bg-white font-bold text-slate-900 text-xs outline-none cursor-pointer shadow-sm"
                   >
                     <option value="">-- Seleccionar paciente de la lista --</option>
@@ -687,7 +754,7 @@ function EnfermeriaContent() {
                   </div>
                 </div>
                 <p className="m-0 text-xs text-teal-800 font-semibold">
-                  {registroPendienteId ? 'El registro ya se creó. Termine de subir los adjuntos pendientes con el botón de abajo.' : 'Cada guardado crea un registro nuevo para este paciente y conserva los anteriores.'}
+                  {registroEditando ? 'Los cambios se guardarán únicamente en este registro. Puede añadir o quitar sus adjuntos desde la carpeta.' : registroPendienteId ? 'El registro ya se creó. Termine de subir los adjuntos pendientes con el botón de abajo.' : 'Cada guardado crea un registro nuevo para este paciente y conserva los anteriores.'}
                 </p>
                 <button
                   type="button"
@@ -894,8 +961,9 @@ function EnfermeriaContent() {
                   disabled={saving}
                   className="w-full py-3 bg-teal-700 hover:bg-teal-800 text-white font-extrabold text-sm rounded-xl border-none cursor-pointer shadow-md transition-all flex items-center justify-center gap-2"
                 >
-                  <span>🩺</span> {saving ? 'Guardando triaje...' : registroPendienteId ? 'Reintentar adjuntos pendientes' : 'Guardar nuevo registro de triaje'}
+                  <span>🩺</span> {saving ? 'Guardando triaje...' : registroEditando ? 'Guardar cambios de este registro' : registroPendienteId ? 'Reintentar adjuntos pendientes' : 'Guardar nuevo registro de triaje'}
                 </button>
+                {registroEditando && <button type="button" onClick={cancelarEdicion} disabled={saving} className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-300 cursor-pointer">Cancelar edición y volver a nuevo registro</button>}
               </form>
             </div>
 
@@ -961,6 +1029,7 @@ function EnfermeriaContent() {
                             >
                               📋 Ver registros ({registros.length})
                             </button>
+                            <button type="button" onClick={() => iniciarEdicion(t)} className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-1 rounded-lg text-xs font-extrabold cursor-pointer">✏️ Editar último</button>
                             <button
                               type="button"
                               onClick={(e) => ejecutarImpresionTriaje(t, e)}
@@ -1020,7 +1089,10 @@ function EnfermeriaContent() {
                   <button type="button" onClick={volverARegistros} className="text-xs font-bold text-teal-800 cursor-pointer">← Volver a todos los registros</button>
                   <div className="flex items-center justify-between gap-2">
                     <h4 className="m-0 text-sm font-extrabold text-slate-900">Registro del {fechaTriaje(detalleTriaje)}</h4>
-                    <button type="button" onClick={e => ejecutarImpresionTriaje(detalleTriaje, e)} className="bg-slate-100 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer">🖨️ Imprimir</button>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => iniciarEdicion(detalleTriaje)} className="bg-amber-50 text-amber-900 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer">✏️ Editar este registro</button>
+                      <button type="button" onClick={e => ejecutarImpresionTriaje(detalleTriaje, e)} className="bg-slate-100 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer">🖨️ Imprimir</button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {CAMPOS_DETALLE.filter(({ campo }) => detalleTriaje[campo] !== null && detalleTriaje[campo] !== undefined && detalleTriaje[campo] !== '').map(({ campo, etiqueta }) => (
@@ -1050,6 +1122,7 @@ function EnfermeriaContent() {
                     </div>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => abrirDetalleTriaje(registro)} className="bg-teal-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer">Ver datos y adjuntos</button>
+                      <button type="button" onClick={() => iniciarEdicion(registro)} className="bg-amber-50 text-amber-900 px-2 py-1.5 rounded-lg text-xs font-bold cursor-pointer">Editar</button>
                       <button type="button" onClick={e => ejecutarImpresionTriaje(registro, e)} className="bg-slate-200 px-2 py-1.5 rounded-lg text-xs font-bold cursor-pointer">Imprimir</button>
                       <button type="button" onClick={e => handleEliminarTriaje(registro.id, e)} className="bg-rose-50 text-rose-700 px-2 py-1.5 rounded-lg text-xs font-bold cursor-pointer">Eliminar</button>
                     </div>
