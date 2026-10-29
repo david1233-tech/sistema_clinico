@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS triaje (
   temperatura VARCHAR(30),
   hb VARCHAR(30),
   presion VARCHAR(30),
+  frecuencia_respiratoria VARCHAR(30),
+  glucosa VARCHAR(50),
   observaciones TEXT,
   fecha TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

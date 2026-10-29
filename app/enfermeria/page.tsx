@@ -514,14 +514,15 @@ function EnfermeriaContent() {
                 <div className="p-2 border rounded">Pulso: <strong>{triajeImprimir.pulso} bpm</strong></div>
                 <div className="p-2 border rounded">SpO2: <strong>{triajeImprimir.so2} %</strong></div>
                 <div className="p-2 border rounded">Temp: <strong>{triajeImprimir.temperatura} °C</strong></div>
+                {triajeImprimir.presion_arterial && <div className="p-2 border rounded">P/A: <strong>{triajeImprimir.presion_arterial} mmHg</strong></div>}
+                {triajeImprimir.frecuencia_respiratoria && <div className="p-2 border rounded">F. respiratoria: <strong>{triajeImprimir.frecuencia_respiratoria} rpm</strong></div>}
               </div>
             </div>
-            {(triajeImprimir.hb || triajeImprimir.presion_arterial || triajeImprimir.glucosa || triajeImprimir.colesterol || triajeImprimir.trigliceridos || triajeImprimir.agua_porcentaje) && (
+            {(triajeImprimir.hb || triajeImprimir.glucosa || triajeImprimir.colesterol || triajeImprimir.trigliceridos || triajeImprimir.agua_porcentaje) && (
               <div className="mb-4">
                 <h4 className="text-xs font-extrabold uppercase text-teal-900 border-b pb-1 mb-2">COMPOSICIÓN Y EXÁMENES REGISTRADOS</h4>
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   {triajeImprimir.hb && <div className="p-2 border rounded">Hemoglobina (HB): <strong>{triajeImprimir.hb}</strong></div>}
-                  {triajeImprimir.presion_arterial && <div className="p-2 border rounded">P/A: <strong>{triajeImprimir.presion_arterial}</strong></div>}
                   {triajeImprimir.glucosa && <div className="p-2 border rounded">Glucosa: <strong>{triajeImprimir.glucosa}</strong></div>}
                   {triajeImprimir.colesterol && <div className="p-2 border rounded">Colesterol: <strong>{triajeImprimir.colesterol}</strong></div>}
                   {triajeImprimir.trigliceridos && <div className="p-2 border rounded">Triglicéridos: <strong>{triajeImprimir.trigliceridos}</strong></div>}
@@ -698,7 +699,7 @@ function EnfermeriaContent() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2.5 mt-2.5">
+                  <div className="grid grid-cols-3 gap-2.5 mt-2.5">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-700 mb-1">T° (°C) *</label>
                       <input
@@ -712,6 +713,14 @@ function EnfermeriaContent() {
                         required
                       />
                     </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">P/A (mmHg) *</label>
+                      <input type="text" name="presion_arterial" value={form.presion_arterial} onChange={handleChange} placeholder="120/80" className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600" required />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">F. Respiratoria (rpm) *</label>
+                      <input type="number" min="1" name="frecuencia_respiratoria" value={form.frecuencia_respiratoria} onChange={handleChange} placeholder="18" className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600" required />
+                    </div>
                   </div>
                 </div>
                 <button
@@ -724,10 +733,6 @@ function EnfermeriaContent() {
                 </button>
                 {mostrarOpcionales && (
                   <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex flex-col gap-3 animate-fadeIn text-xs">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-700 mb-1">HB (Hemoglobina)</label>
-                      <input type="number" step="0.1" name="hb" value={form.hb} onChange={handleChange} placeholder="Ej: 13.5" className="w-full p-2 rounded-xl border border-slate-300 bg-white font-bold text-xs outline-none focus:border-teal-600" />
-                    </div>
                     <div className="border-b border-slate-200 pb-2">
                       <span className="text-[10px] font-black text-teal-800 uppercase tracking-wider block mb-2">
                         💧 COMPOSICIÓN CORPORAL Y METABOLISMO
@@ -781,29 +786,20 @@ function EnfermeriaContent() {
                         </div>
                       </div>
                     </div>
-                    <div className="border-b border-slate-200 pb-2">
+                    <div>
                       <span className="text-[10px] font-black text-teal-800 uppercase tracking-wider block mb-2">
-                        🩺 SIGNOS Y PARÁMETROS CLÍNICOS
+                        🧪 EXÁMENES AUXILIARES Y LABORATORIO
                       </span>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 gap-2 mb-2">
                         <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">P/A (mmHg)</label>
-                          <input type="text" name="presion_arterial" value={form.presion_arterial} onChange={handleChange} placeholder="120/80" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">F.Resp (rpm)</label>
-                          <input type="text" name="frecuencia_respiratoria" value={form.frecuencia_respiratoria} onChange={handleChange} placeholder="18" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
+                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">HB (Hemoglobina)</label>
+                          <input type="number" step="0.1" name="hb" value={form.hb} onChange={handleChange} placeholder="Ej: 13.5" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
                         </div>
                         <div>
                           <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Glucosa</label>
                           <input type="text" name="glucosa" value={form.glucosa} onChange={handleChange} placeholder="95 mg/dL" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
                         </div>
                       </div>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-black text-teal-800 uppercase tracking-wider block mb-2">
-                        🧪 EXÁMENES AUXILIARES Y LABORATORIO
-                      </span>
                       <div className="grid grid-cols-3 gap-2 mb-2">
                         <div>
                           <label className="block text-[9px] font-bold text-slate-600 mb-0.5">G. Rojos</label>
@@ -1016,13 +1012,13 @@ function EnfermeriaContent() {
                           <span className="bg-slate-100 text-slate-800 px-2 py-1 rounded-lg font-bold">Pulso: {t.pulso}</span>
                           <span className="bg-slate-100 text-slate-800 px-2 py-1 rounded-lg font-bold">SO2: {t.so2}%</span>
                           <span className="bg-rose-50 text-rose-700 border border-rose-200 px-2 py-1 rounded-lg font-extrabold">T°: {t.temperatura}°C</span>
+                          {t.presion_arterial && <span className="bg-teal-50 text-teal-900 border border-teal-200 px-2 py-1 rounded-lg font-bold">P/A: {t.presion_arterial}</span>}
+                          {t.frecuencia_respiratoria && <span className="bg-teal-50 text-teal-900 border border-teal-200 px-2 py-1 rounded-lg font-bold">F. Resp: {t.frecuencia_respiratoria} rpm</span>}
                         </div>
                         {/* DATOS OPCIONALES RELLENADOS */}
-                        {(t.hb || t.presion_arterial || t.frecuencia_respiratoria || t.glucosa || t.agua_porcentaje || t.grasa_porcentaje || t.grasa_visceral || t.colesterol || t.trigliceridos || t.antecedentes || t.creatinina || t.urea || t.musculo_esqueletico_porcentaje || t.musculos_porcentaje || t.metabolismo || t.proteina || t.edad_metabolica || t.circunferencia_abdominal || t.globulos_rojos || t.globulos_blancos || t.hb_glicosilada || t.vcm || t.tgo || t.tgp || t.t3_t4_tsh) && (
+                        {(t.hb || t.glucosa || t.agua_porcentaje || t.grasa_porcentaje || t.grasa_visceral || t.colesterol || t.trigliceridos || t.antecedentes || t.creatinina || t.urea || t.musculo_esqueletico_porcentaje || t.musculos_porcentaje || t.metabolismo || t.proteina || t.edad_metabolica || t.circunferencia_abdominal || t.globulos_rojos || t.globulos_blancos || t.hb_glicosilada || t.vcm || t.tgo || t.tgp || t.t3_t4_tsh) && (
                           <div className="flex flex-wrap gap-1.5 text-xs pt-1 border-t border-slate-100">
                             {t.hb && <span className="bg-rose-50 text-rose-900 border border-rose-200 px-2 py-0.5 rounded-md font-bold">HB: {t.hb}</span>}
-                            {t.presion_arterial && <span className="bg-teal-50 text-teal-900 border border-teal-200 px-2 py-0.5 rounded-md font-bold">P/A: {t.presion_arterial}</span>}
-                            {t.frecuencia_respiratoria && <span className="bg-teal-50 text-teal-900 border border-teal-200 px-2 py-0.5 rounded-md font-bold">F.Resp: {t.frecuencia_respiratoria}</span>}
                             {t.glucosa && <span className="bg-amber-50 text-amber-900 border border-amber-200 px-2 py-0.5 rounded-md font-bold">Glucosa: {t.glucosa}</span>}
                             {t.agua_porcentaje && <span className="bg-blue-50 text-blue-900 border border-blue-200 px-2 py-0.5 rounded-md font-bold">Agua: {t.agua_porcentaje}</span>}
                             {t.grasa_porcentaje && <span className="bg-rose-50 text-rose-900 border border-rose-200 px-2 py-0.5 rounded-md font-bold">Grasa: {t.grasa_porcentaje}</span>}

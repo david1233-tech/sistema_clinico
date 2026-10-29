@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
+import { ensureTriajeCampos } from '@/lib/triaje-campos';
 import type { ResultSetHeader } from 'mysql2';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const [triajes]: any = await pool.query('SELECT * FROM triaje ORDER BY id DESC');
+    await ensureTriajeCampos();
+    const [triajes] = await pool.query<Record<string, unknown>[]>('SELECT *, presion AS presion_arterial FROM triaje ORDER BY id DESC');
     return NextResponse.json(triajes);
   } catch (error) {
     console.error('Error al obtener triajes:', error);
@@ -27,6 +29,8 @@ export async function POST(request: Request) {
     let temperatura = '';
     let hb = '';
     let presion = '';
+    let frecuencia_respiratoria = '';
+    let glucosa = '';
     let observaciones = '';
     
     const contentType = request.headers.get('content-type') || '';
@@ -44,7 +48,9 @@ export async function POST(request: Request) {
       so2 = formData.get('so2')?.toString() || '';
       temperatura = formData.get('temperatura')?.toString() || '';
       hb = formData.get('hb')?.toString() || '';
-      presion = formData.get('presion')?.toString() || '';
+      presion = formData.get('presion_arterial')?.toString() || formData.get('presion')?.toString() || '';
+      frecuencia_respiratoria = formData.get('frecuencia_respiratoria')?.toString() || '';
+      glucosa = formData.get('glucosa')?.toString() || '';
       observaciones = formData.get('observaciones')?.toString() || '';
     } else {
       const body = await request.json();
@@ -58,7 +64,9 @@ export async function POST(request: Request) {
       so2 = body.so2 || '';
       temperatura = body.temperatura || '';
       hb = body.hb || '';
-      presion = body.presion || '';
+      presion = body.presion_arterial || body.presion || '';
+      frecuencia_respiratoria = body.frecuencia_respiratoria || '';
+      glucosa = body.glucosa || '';
       observaciones = body.observaciones || '';
     }
 
@@ -66,11 +74,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'El DNI del paciente es obligatorio' }, { status: 400 });
     }
 
-    // Insertar en la base de datos MySQL
-    const [result]: any = await pool.query(
+    await ensureTriajeCampos();
+    const [result] = await pool.query<ResultSetHeader>(
       `INSERT INTO triaje 
-        (dni_paciente, nombre_paciente, edad, talla, peso, imc, pulso, so2, temperatura, hb, presion, observaciones) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (dni_paciente, nombre_paciente, edad, talla, peso, imc, pulso, so2, temperatura, hb, presion, frecuencia_respiratoria, glucosa, observaciones) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         dni_paciente,
         nombre_paciente || 'Paciente Sin Nombre',
@@ -83,6 +91,8 @@ export async function POST(request: Request) {
         temperatura || null,
         hb || null,
         presion || null,
+        frecuencia_respiratoria || null,
+        glucosa || null,
         observaciones || ''
       ]
     );
@@ -100,6 +110,9 @@ export async function POST(request: Request) {
       temperatura,
       hb,
       presion,
+      presion_arterial: presion,
+      frecuencia_respiratoria,
+      glucosa,
       observaciones,
       fecha: new Date().toISOString()
     };
@@ -139,14 +152,17 @@ export async function PUT(request: Request) {
   }
   if (!body.id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
   try {
+    await ensureTriajeCampos();
     const [result] = await pool.execute<ResultSetHeader>(
       `UPDATE triaje SET dni_paciente = ?, nombre_paciente = ?, edad = ?, talla = ?, peso = ?, imc = ?,
-       pulso = ?, so2 = ?, temperatura = ?, hb = ?, presion = ?, observaciones = ? WHERE id = ?`,
+       pulso = ?, so2 = ?, temperatura = ?, hb = ?, presion = ?, frecuencia_respiratoria = ?, glucosa = ?, observaciones = ? WHERE id = ?`,
       [String(body.dni_paciente ?? ''), String(body.nombre_paciente ?? ''), body.edad ? String(body.edad) : null,
         body.talla ? String(body.talla) : null, body.peso ? String(body.peso) : null,
         body.imc ? String(body.imc) : null, body.pulso ? String(body.pulso) : null,
         body.so2 ? String(body.so2) : null, body.temperatura ? String(body.temperatura) : null,
-        body.hb ? String(body.hb) : null, body.presion ? String(body.presion) : null,
+        body.hb ? String(body.hb) : null, body.presion_arterial || body.presion ? String(body.presion_arterial ?? body.presion) : null,
+        body.frecuencia_respiratoria ? String(body.frecuencia_respiratoria) : null,
+        body.glucosa ? String(body.glucosa) : null,
         String(body.observaciones ?? ''), String(body.id)]
     );
     if (!result.affectedRows) return NextResponse.json({ error: 'Triaje no encontrado' }, { status: 404 });
