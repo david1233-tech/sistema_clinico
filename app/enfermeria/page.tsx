@@ -137,15 +137,6 @@ function EnfermeriaContent() {
     }
   }, [dniParam, pacientesRegistrados]);
 
-  useEffect(() => {
-    const pesoNum = parseFloat(form.peso);
-    const tallaNum = parseFloat(form.talla) / 100;
-    if (pesoNum > 0 && tallaNum > 0) {
-      const imcCalculado = (pesoNum / (tallaNum * tallaNum)).toFixed(1);
-      setForm(prev => ({ ...prev, imc: imcCalculado }));
-    }
-  }, [form.peso, form.talla]);
-
   const abrirCamara = async () => {
     try {
       setCamaraActiva(true);
@@ -290,7 +281,10 @@ function EnfermeriaContent() {
           ...prev,
           dni_paciente: paciente.dni || paciente.dni_paciente || '',
           nombre_paciente: nombre,
-          edad: paciente.edad ? String(paciente.edad) : prev.edad
+          edad: paciente.edad ? String(paciente.edad) : (prev.dni_paciente === dniElegido ? prev.edad : ''),
+          talla: prev.dni_paciente === dniElegido ? prev.talla : '',
+          peso: prev.dni_paciente === dniElegido ? prev.peso : '',
+          imc: prev.dni_paciente === dniElegido ? prev.imc : ''
         }));
       }
     }
@@ -392,8 +386,10 @@ function EnfermeriaContent() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === 'dni_paciente') {
-      setForm(prev => ({ ...prev, dni_paciente: value }));
+      setForm(prev => ({ ...prev, dni_paciente: value, peso: '', talla: '', imc: '' }));
       cargarDatosPacientePorDni(value);
+    } else if (name === 'peso' || name === 'imc') {
+      setForm(prev => ({ ...prev, [name]: value.replace(/,/g, '.') }));
     } else {
       setForm(prev => ({ ...prev, [name]: value }));
     }
@@ -650,8 +646,10 @@ function EnfermeriaContent() {
                     <div>
                       <label className="block text-[10px] font-bold text-slate-700 mb-1">PESO (kg) *</label>
                       <input
-                        type="number"
-                        step="0.1"
+                        type="text"
+                        inputMode="decimal"
+                        pattern="[0-9]+([.][0-9]{1,2})?"
+                        title="Ingrese el peso con punto decimal, por ejemplo 68.5"
                         name="peso"
                         value={form.peso}
                         onChange={handleChange}
@@ -666,6 +664,9 @@ function EnfermeriaContent() {
                       <label className="block text-[10px] font-bold text-slate-700 mb-1">IMC *</label>
                       <input
                         type="text"
+                        inputMode="decimal"
+                        pattern="[0-9]+([.][0-9]{1,2})?"
+                        title="Ingrese el IMC manualmente, por ejemplo 24.5"
                         name="imc"
                         value={form.imc}
                         onChange={handleChange}
