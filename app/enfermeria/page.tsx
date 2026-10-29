@@ -47,6 +47,7 @@ interface Triaje {
 }
 
 interface Adjunto { id: number; nombre: string; tipo: string; fecha: string }
+const MAX_ADJUNTOS_TRIAJE = 200;
 
 function EnfermeriaContent() {
   const searchParams = useSearchParams();
@@ -65,6 +66,7 @@ function EnfermeriaContent() {
   const [carpetaAbierta, setCarpetaAbierta] = useState(false);
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
   const [pendientes, setPendientes] = useState<File[]>([]);
+  const [avanceSubida, setAvanceSubida] = useState<{ completados: number; total: number } | null>(null);
   const [camaraActiva, setCamaraActiva] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -176,8 +178,8 @@ function EnfermeriaContent() {
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        if (adjuntos.length + pendientes.length >= 30) {
-          alert('Se permiten hasta 30 adjuntos por triaje.');
+        if (adjuntos.length + pendientes.length >= MAX_ADJUNTOS_TRIAJE) {
+          alert('Se permiten hasta 200 adjuntos por triaje.');
         } else {
           canvas.toBlob(blob => {
             if (blob) setPendientes(prev => [...prev, new File([blob], `foto-${Date.now()}.jpg`, { type: 'image/jpeg' })]);
@@ -298,7 +300,7 @@ function EnfermeriaContent() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (adjuntos.length + pendientes.length + files.length > 30) alert('Se permiten hasta 30 adjuntos por triaje.');
+    if (adjuntos.length + pendientes.length + files.length > MAX_ADJUNTOS_TRIAJE) alert('Se permiten hasta 200 adjuntos por triaje.');
     else if (files.some(file => file.size > 3 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'].includes(file.type))) {
       alert('Solo imágenes JPG, PNG, WebP, GIF o PDF de hasta 3 MB por archivo.');
     } else setPendientes(prev => [...prev, ...files]);
@@ -312,6 +314,8 @@ function EnfermeriaContent() {
   };
 
   const subirPendientes = async (id: string | number) => {
+    setAvanceSubida({ completados: 0, total: pendientes.length });
+    let completados = 0;
     for (const archivo of pendientes) {
       const data = new FormData();
       data.append('triaje_id', String(id));
@@ -319,6 +323,8 @@ function EnfermeriaContent() {
       const res = await fetch('/api/triaje/adjuntos', { method: 'POST', body: data });
       if (!res.ok) throw new Error((await res.json()).error || `No se pudo subir ${archivo.name}`);
       setPendientes(prev => prev.filter(file => file !== archivo));
+      completados += 1;
+      setAvanceSubida({ completados, total: pendientes.length });
     }
     await cargarAdjuntos(id);
   };
@@ -448,6 +454,7 @@ function EnfermeriaContent() {
       alert(err instanceof Error ? err.message : 'No se pudo guardar el triaje');
     } finally {
       setSaving(false);
+      setAvanceSubida(null);
     }
   };
 
@@ -865,6 +872,7 @@ function EnfermeriaContent() {
                     <button
                       type="button"
                       onClick={abrirCamara}
+                      disabled={saving}
                       className="w-full sm:w-auto px-3 py-2 bg-teal-800 hover:bg-teal-900 text-white font-extrabold text-xs rounded-xl cursor-pointer flex items-center justify-center gap-1.5 shadow-sm transition-all"
                     >
                       📸 Tomar Foto
@@ -874,6 +882,7 @@ function EnfermeriaContent() {
                       accept="image/*,application/pdf"
                       multiple
                       onChange={handleFileChange}
+                      disabled={saving}
                       className="block w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-200 file:text-slate-800 hover:file:bg-slate-300 cursor-pointer"
                     />
                   </div>
@@ -899,9 +908,10 @@ function EnfermeriaContent() {
                       </div>
                     </div>
                   )}
-                  <p className="mt-2 text-xs text-slate-600">Hasta 30 fotos o archivos PDF, 3 MB cada uno. Se guardan al guardar el triaje.</p>
+                  <p className="mt-2 text-xs text-slate-600">Hasta 200 fotos o archivos PDF, 3 MB cada uno. Se guardan al guardar el triaje.</p>
+                  {avanceSubida && avanceSubida.total > 0 && <p className="mt-1 text-xs font-bold text-teal-800" role="status">Subiendo adjuntos: {avanceSubida.completados} de {avanceSubida.total}</p>}
                   <button type="button" onClick={() => setCarpetaAbierta(true)} className="mt-2 w-full bg-white border border-teal-300 rounded-xl p-3 text-left text-sm font-bold text-teal-900 hover:bg-teal-50 cursor-pointer">
-                    📁 Abrir carpeta de adjuntos ({adjuntos.length + pendientes.length}/30)
+                    📁 Abrir carpeta de adjuntos ({adjuntos.length + pendientes.length}/{MAX_ADJUNTOS_TRIAJE})
                   </button>
                 </div>
                 <div>
@@ -1056,7 +1066,7 @@ function EnfermeriaContent() {
         {carpetaAbierta && (
           <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4" onClick={() => setCarpetaAbierta(false)}>
             <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-auto p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
-              <div className="flex justify-between items-center mb-4"><h3 className="font-extrabold text-teal-900">📁 Adjuntos del triaje ({adjuntos.length + pendientes.length}/30)</h3><button type="button" onClick={() => setCarpetaAbierta(false)}>✕</button></div>
+              <div className="flex justify-between items-center mb-4"><h3 className="font-extrabold text-teal-900">📁 Adjuntos del triaje ({adjuntos.length + pendientes.length}/{MAX_ADJUNTOS_TRIAJE})</h3><button type="button" onClick={() => setCarpetaAbierta(false)}>✕</button></div>
               {adjuntos.length + pendientes.length === 0 && <p className="text-sm text-slate-500">Esta carpeta está vacía.</p>}
               <div className="space-y-2">
                 {adjuntos.map(item => <div key={item.id} className="flex items-center gap-2 p-2 border rounded-lg text-sm">

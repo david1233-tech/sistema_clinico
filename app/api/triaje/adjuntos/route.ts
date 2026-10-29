@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { pgPool } from '@/lib/db';
 import { ensureTriajeAdjuntos } from '@/lib/triaje-adjuntos';
 
-const MAX_ADJUNTOS = 30;
+const MAX_ADJUNTOS = 200;
 const MAX_BYTES = 3 * 1024 * 1024;
 const TIPOS = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']);
 
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     const count = await client.query('SELECT COUNT(*)::int AS total FROM triaje_adjuntos WHERE triaje_id = $1', [id]);
     if (count.rows[0].total >= MAX_ADJUNTOS) {
       await client.query('ROLLBACK');
-      return NextResponse.json({ error: 'Máximo 30 adjuntos por triaje' }, { status: 400 });
+      return NextResponse.json({ error: 'Máximo 200 adjuntos por triaje' }, { status: 400 });
     }
     const data = Buffer.from(await archivo.arrayBuffer());
     const saved = await client.query(
