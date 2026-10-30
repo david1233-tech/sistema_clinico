@@ -32,23 +32,39 @@ export async function POST(request: Request) {
         temperature: 0,
         response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: [
-          { type: 'text', text: `Transcribe esta foto de un historial o ficha clínica en español. Devuelve únicamente un objeto JSON con los campos que aparecen explícitamente y se leen con seguridad. No inventes datos ni calcules valores. Si hay múltiples fechas, usa los datos de la medición más reciente claramente identificada. Claves permitidas: ${CAMPOS.join(', ')}. Usa DNI de 8 dígitos, talla en cm, peso en kg, temperatura en °C, presión arterial como sistólica/diastólica. Los valores son cadenas. Omite campos ausentes o ilegibles.` },
+          { type: 'text', text: `Lee esta foto de una ficha clínica en español, incluso si está borrosa o tiene sombras. Intenta extraer cada dato que todavía se alcance a distinguir. Devuelve JSON con dos propiedades: "campos", objeto con los valores que puedas asociar con claridad a estas claves: ${CAMPOS.join(', ')}; y "texto_visible", cadena breve con el texto o cifras visibles que no puedas asociar con seguridad a un campo. No inventes valores ni conviertas una cifra dudosa en un dato clínico. Si hay varias fechas, usa la medición más reciente claramente identificada. Usa DNI de 8 dígitos, talla en cm, peso en kg, temperatura en °C y presión arterial como sistólica/diastólica. Todos los valores de "campos" son cadenas; omite los ausentes.` },
           { type: 'image_url', image_url: { url: image, detail: 'high' } }
         ] }]
       }),
       cache: 'no-store'
     });
-    if (!response.ok) throw new Error(`El servicio de lectura respondió ${response.status}`);
+    if (!response.ok) {
+      const failure = await response.json().catch(() => ({}));
+      const code = failure?.error?.code || failure?.error?.type;
+      console.error('Error del servicio de lectura:', response.status, code || failure?.error?.type);
+      if (response.status === 401) return NextResponse.json({ error: 'La clave OPENAI_API_KEY no es válida. Revísela en Vercel y vuelva a desplegar.' }, { status: 502 });
+      if (response.status === 429) {
+        const sinCredito = ['credit_balance_exhausted', 'insufficient_quota', 'organization_spend_limit_exceeded', 'project_spend_limit_exceeded', 'organization_usage_limit_exceeded'].includes(code);
+        return NextResponse.json({ error: sinCredito ? 'La cuenta de OpenAI API no tiene saldo disponible o alcanzó su límite de gasto. Revise Billing y Limits en OpenAI Platform.' : 'El servicio de lectura recibió demasiadas solicitudes. Espere un momento e intente de nuevo.' }, { status: 503 });
+      }
+      if (response.status === 403) return NextResponse.json({ error: 'La clave no tiene permiso para usar el servicio de lectura. Revise los permisos del proyecto en OpenAI Platform.' }, { status: 502 });
+      if (response.status === 400 || response.status === 404) return NextResponse.json({ error: 'El servicio rechazó la foto o el modelo configurado. Revise OPENAI_VISION_MODEL y el acceso del proyecto a ese modelo.' }, { status: 502 });
+      return NextResponse.json({ error: 'El servicio de lectura no está disponible en este momento. Intente más tarde.' }, { status: 502 });
+    }
     const result = await response.json();
-    const parsed = JSON.parse(result.choices?.[0]?.message?.content || '{}') as Record<string, unknown>;
+    const content = result.choices?.[0]?.message?.content;
+    if (typeof content !== 'string') throw new Error('El servicio no devolvió texto');
+    const parsed = JSON.parse(content) as Record<string, unknown>;
+    const origen = parsed.campos && typeof parsed.campos === 'object' && !Array.isArray(parsed.campos) ? parsed.campos as Record<string, unknown> : parsed;
     const campos = Object.fromEntries(CAMPOS.flatMap(campo => {
-      const valor = parsed[campo];
-      return typeof valor === 'string' && valor.trim() ? [[campo, valor.trim().slice(0, 500)]] : [];
+      const valor = origen[campo];
+      return (typeof valor === 'string' || typeof valor === 'number') && String(valor).trim() ? [[campo, String(valor).trim().slice(0, 500)]] : [];
     }));
-    return NextResponse.json({ campos });
+    const texto_visible = typeof parsed.texto_visible === 'string' ? parsed.texto_visible.trim().slice(0, 1500) : '';
+    return NextResponse.json({ campos, texto_visible });
   } catch (error) {
     console.error('Error leyendo historial:', error);
-    return NextResponse.json({ error: 'No se pudo leer la foto. Intente con una imagen más nítida.' }, { status: 502 });
+    return NextResponse.json({ error: 'No se pudo completar la lectura por un error técnico. Intente de nuevo en unos momentos.' }, { status: 502 });
   }
 }
 

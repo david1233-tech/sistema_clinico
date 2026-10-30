@@ -77,6 +77,33 @@ const CAMPOS_DETALLE: { campo: keyof Triaje; etiqueta: string }[] = [
   { campo: 'observaciones', etiqueta: 'Observaciones' }
 ];
 
+const DATOS_OPCIONALES_ORDENADOS = [
+  { campo: 'grasa_porcentaje', etiqueta: 'Grasa %', ejemplo: 'Ej: 22%' },
+  { campo: 'grasa_visceral', etiqueta: 'G. Visceral', ejemplo: 'Ej: 8' },
+  { campo: 'musculo_esqueletico_porcentaje', etiqueta: 'M.MusEque%', ejemplo: 'Ej: 30%' },
+  { campo: 'musculos_porcentaje', etiqueta: 'Músculos%', ejemplo: 'Ej: 40%' },
+  { campo: 'agua_porcentaje', etiqueta: 'Agua %', ejemplo: 'Ej: 55%' },
+  { campo: 'metabolismo', etiqueta: 'Metabolismo', ejemplo: 'Ej: 1450 kcal' },
+  { campo: 'proteina', etiqueta: 'Proteína', ejemplo: 'Ej: 18%' },
+  { campo: 'grado_obesidad_porcentaje', etiqueta: 'Grado de Obesidad%', ejemplo: 'Ej: +12%' },
+  { campo: 'edad_metabolica', etiqueta: 'Edad Metabólica', ejemplo: 'Ej: 32 años' },
+  { campo: 'circunferencia_abdominal', etiqueta: 'Circunferencia Abdominal', ejemplo: 'Ej: 85 cm' },
+  { campo: 'frecuencia_respiratoria', etiqueta: 'F. Respiratoria (rpm)', ejemplo: 'Ej: 18' },
+  { campo: 'hb', etiqueta: 'HB', ejemplo: 'Ej: 13.5' },
+  { campo: 'globulos_rojos', etiqueta: 'G. Rojos', ejemplo: 'Ej: 4.5 mill' },
+  { campo: 'globulos_blancos', etiqueta: 'G. Blancos', ejemplo: 'Ej: 7500' },
+  { campo: 'hb_glicosilada', etiqueta: 'HB. Glicosilada', ejemplo: 'Ej: 5.4%' },
+  { campo: 'vcm', etiqueta: 'VCM', ejemplo: 'Ej: 88 fL' },
+  { campo: 'glucosa', etiqueta: 'Glucosa', ejemplo: 'Ej: 95 mg/dL' },
+  { campo: 'colesterol', etiqueta: 'Colesterol', ejemplo: 'Ej: 180 mg/dL' },
+  { campo: 'trigliceridos', etiqueta: 'Triglicéridos', ejemplo: 'Ej: 140 mg/dL' },
+  { campo: 'creatinina', etiqueta: 'Creatinina', ejemplo: 'Ej: 0.9 mg/dL' },
+  { campo: 'urea', etiqueta: 'Urea', ejemplo: 'Ej: 25 mg/dL' },
+  { campo: 'tgo', etiqueta: 'TGO', ejemplo: 'Ej: 22 U/L' },
+  { campo: 'tgp', etiqueta: 'TGP', ejemplo: 'Ej: 25 U/L' },
+  { campo: 't3_t4_tsh', etiqueta: 'T3-T4-TSH', ejemplo: 'Ej: TSH 2.1' },
+] as const;
+
 function crearFormularioTriaje(dni_paciente = '', nombre_paciente = '', edad = '') {
   return {
     dni_paciente, nombre_paciente, edad,
@@ -108,21 +135,26 @@ function fechaTriaje(t: Triaje) {
   return Number.isNaN(parsed.getTime()) ? fecha : parsed.toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-async function prepararFoto(archivo: File): Promise<File> {
+async function prepararFoto(archivo: File, ladoMaximo = 1800): Promise<File> {
   if (archivo.size <= 3 * 1024 * 1024 && ['image/jpeg', 'image/png', 'image/webp'].includes(archivo.type)) return archivo;
   const url = URL.createObjectURL(archivo);
   try {
     const imagen = new Image();
     imagen.src = url;
     await imagen.decode();
-    const escala = Math.min(1, 1800 / Math.max(imagen.naturalWidth, imagen.naturalHeight));
     const canvas = document.createElement('canvas');
-    canvas.width = Math.round(imagen.naturalWidth * escala);
-    canvas.height = Math.round(imagen.naturalHeight * escala);
-    canvas.getContext('2d')?.drawImage(imagen, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
-    if (!blob || blob.size > 3 * 1024 * 1024) throw new Error('La foto es demasiado grande. Intente con menor resolución.');
-    return new File([blob], `foto-${Date.now()}.jpg`, { type: 'image/jpeg' });
+    for (let intento = 0; intento < 3; intento++) {
+      const escala = Math.min(1, ladoMaximo / Math.max(imagen.naturalWidth, imagen.naturalHeight));
+      canvas.width = Math.round(imagen.naturalWidth * escala);
+      canvas.height = Math.round(imagen.naturalHeight * escala);
+      canvas.getContext('2d')?.drawImage(imagen, 0, 0, canvas.width, canvas.height);
+      for (const calidad of [0.88, 0.72, 0.55]) {
+        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', calidad));
+        if (blob && blob.size <= 3 * 1024 * 1024) return new File([blob], `foto-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      }
+      ladoMaximo = Math.round(ladoMaximo * 0.8);
+    }
+    throw new Error('La foto es demasiado grande. Intente con menor resolución.');
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -156,6 +188,7 @@ function EnfermeriaContent() {
   const camaraHistorialRef = useRef<HTMLInputElement | null>(null);
   const [leyendoHistorial, setLeyendoHistorial] = useState(false);
   const [mensajeLectura, setMensajeLectura] = useState('');
+  const [textoVisibleHistorial, setTextoVisibleHistorial] = useState('');
   const [zoomImagen, setZoomImagen] = useState(1);
   const distanciaDedosRef = useRef<{ distancia: number; zoom: number } | null>(null);
   const detalleRequestRef = useRef(0);
@@ -193,14 +226,17 @@ function EnfermeriaContent() {
     if (!seleccion) return;
     setLeyendoHistorial(true);
     setMensajeLectura('Leyendo foto del historial...');
+    setTextoVisibleHistorial('');
     try {
-      const archivo = await prepararFoto(seleccion);
+      const archivo = await prepararFoto(seleccion, 2600);
       const data = new FormData();
       data.append('archivo', archivo);
       const res = await fetch('/api/triaje/leer-historial', { method: 'POST', body: data });
       const resultado = await res.json();
       if (!res.ok) throw new Error(resultado.error || 'No se pudo leer la foto.');
       const campos = resultado.campos as Record<string, string>;
+      const textoVisible = typeof resultado.texto_visible === 'string' ? resultado.texto_visible : '';
+      setTextoVisibleHistorial(textoVisible);
       if (form.dni_paciente && campos.dni_paciente && form.dni_paciente !== campos.dni_paciente) {
         throw new Error('El DNI de la foto no coincide con el paciente seleccionado. Revise la foto antes de continuar.');
       }
@@ -210,9 +246,12 @@ function EnfermeriaContent() {
       }
       if (registroEditando || registroPendienteId) delete campos.dni_paciente;
       const reconocidos = Object.keys(campos).length;
-      if (!reconocidos) throw new Error('No se reconocieron datos legibles. Tome una foto más nítida.');
+      if (!reconocidos) {
+        setMensajeLectura(textoVisible ? 'Se encontró texto visible, pero no se pudo asociar a campos con seguridad. Revíselo abajo y complete los datos manualmente.' : 'No se distinguieron datos para completar el formulario. Puede intentar con otra foto o ingresar los datos manualmente.');
+        return;
+      }
       setForm(prev => ({ ...prev, ...campos }));
-      setMensajeLectura(`${reconocidos} datos completados. Revise cada valor antes de guardar.`);
+      setMensajeLectura(`${reconocidos} datos completados. Revise cada valor antes de guardar${textoVisible ? ' y consulte el texto adicional de la foto.' : '.'}`);
     } catch (error) {
       setMensajeLectura(error instanceof Error ? error.message : 'No se pudo leer la foto.');
     } finally {
@@ -627,6 +666,7 @@ function EnfermeriaContent() {
                     {leyendoHistorial ? 'Leyendo foto...' : '📸 Tomar foto del historial'}
                   </button>
                   {mensajeLectura && <p role="status" className="text-xs text-sky-900 mt-2 mb-0">{mensajeLectura}</p>}
+                  {textoVisibleHistorial && <details className="mt-2 text-xs text-sky-900"><summary className="cursor-pointer font-bold">Ver texto adicional detectado</summary><p className="whitespace-pre-wrap break-words mt-1 mb-0">{textoVisibleHistorial}</p></details>}
                 </div>
                 <div className="bg-teal-50 p-3 rounded-xl border border-teal-200">
                   <label className="block text-[11px] font-extrabold text-teal-900 mb-1 uppercase tracking-wider">
@@ -798,135 +838,28 @@ function EnfermeriaContent() {
                   <span className="bg-teal-700 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">Ver más</span>
                 </button>
                 {mostrarOpcionales && (
-                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex flex-col gap-3 animate-fadeIn text-xs">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-700 mb-1">F. Respiratoria (rpm)</label>
-                      <input type="number" min="1" name="frecuencia_respiratoria" value={form.frecuencia_respiratoria} onChange={handleChange} placeholder="18" className="w-full p-2 rounded-xl border border-slate-300 bg-white font-bold text-xs" />
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 animate-fadeIn text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {DATOS_OPCIONALES_ORDENADOS.map(({ campo, etiqueta, ejemplo }) => (
+                        <label key={campo} className="block min-w-0">
+                          <span className="block text-[10px] font-bold text-slate-700 mb-1">{etiqueta}</span>
+                          <input
+                            type={campo === 'hb' || campo === 'frecuencia_respiratoria' ? 'number' : 'text'}
+                            step={campo === 'hb' ? '0.1' : undefined}
+                            min={campo === 'frecuencia_respiratoria' ? '1' : undefined}
+                            name={campo}
+                            value={form[campo]}
+                            onChange={handleChange}
+                            placeholder={ejemplo}
+                            className="w-full p-2 rounded-lg border border-slate-300 bg-white font-bold text-xs"
+                          />
+                        </label>
+                      ))}
                     </div>
-                    <div className="border-b border-slate-200 pb-2">
-                      <span className="text-[10px] font-black text-teal-800 uppercase tracking-wider block mb-2">
-                        💧 COMPOSICIÓN CORPORAL Y METABOLISMO
-                      </span>
-                      <div className="grid grid-cols-3 gap-2 mb-2">
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Agua %</label>
-                          <input type="text" name="agua_porcentaje" value={form.agua_porcentaje} onChange={handleChange} placeholder="Ej: 55%" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Grasa %</label>
-                          <input type="text" name="grasa_porcentaje" value={form.grasa_porcentaje} onChange={handleChange} placeholder="Ej: 22%" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">G. Visceral</label>
-                          <input type="text" name="grasa_visceral" value={form.grasa_visceral} onChange={handleChange} placeholder="Ej: 8" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 mb-2">
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">M.MusEque%</label>
-                          <input type="text" name="musculo_esqueletico_porcentaje" value={form.musculo_esqueletico_porcentaje} onChange={handleChange} placeholder="Ej: 30%" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Músculos%</label>
-                          <input type="text" name="musculos_porcentaje" value={form.musculos_porcentaje} onChange={handleChange} placeholder="Ej: 40%" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Metabolismo</label>
-                          <input type="text" name="metabolismo" value={form.metabolismo} onChange={handleChange} placeholder="Ej: 1450 kcal" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 mb-2">
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Proteína</label>
-                          <input type="text" name="proteina" value={form.proteina} onChange={handleChange} placeholder="Ej: 18%" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Grado Obesidad%</label>
-                          <input type="text" name="grado_obesidad_porcentaje" value={form.grado_obesidad_porcentaje} onChange={handleChange} placeholder="Ej: +12%" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Edad Metabólica</label>
-                          <input type="text" name="edad_metabolica" value={form.edad_metabolica} onChange={handleChange} placeholder="Ej: 32 años" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Circunf. Abdominal</label>
-                          <input type="text" name="circunferencia_abdominal" value={form.circunferencia_abdominal} onChange={handleChange} placeholder="Ej: 85 cm" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-black text-teal-800 uppercase tracking-wider block mb-2">
-                        🧪 EXÁMENES AUXILIARES Y LABORATORIO
-                      </span>
-                      <div className="grid grid-cols-2 gap-2 mb-2">
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">HB (Hemoglobina)</label>
-                          <input type="number" step="0.1" name="hb" value={form.hb} onChange={handleChange} placeholder="Ej: 13.5" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Glucosa</label>
-                          <input type="text" name="glucosa" value={form.glucosa} onChange={handleChange} placeholder="95 mg/dL" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 mb-2">
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">G. Rojos</label>
-                          <input type="text" name="globulos_rojos" value={form.globulos_rojos} onChange={handleChange} placeholder="4.5 mill" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">G. Blancos</label>
-                          <input type="text" name="globulos_blancos" value={form.globulos_blancos} onChange={handleChange} placeholder="7500" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Hb. Glicosilada</label>
-                          <input type="text" name="hb_glicosilada" value={form.hb_glicosilada} onChange={handleChange} placeholder="5.4 %" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 mb-2">
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">VCM</label>
-                          <input type="text" name="vcm" value={form.vcm} onChange={handleChange} placeholder="88 fL" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Colesterol</label>
-                          <input type="text" name="colesterol" value={form.colesterol} onChange={handleChange} placeholder="180 mg/dL" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Triglicéridos</label>
-                          <input type="text" name="trigliceridos" value={form.trigliceridos} onChange={handleChange} placeholder="140 mg/dL" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 mb-2">
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Creatinina</label>
-                          <input type="text" name="creatinina" value={form.creatinina} onChange={handleChange} placeholder="0.9 mg/dL" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">Urea</label>
-                          <input type="text" name="urea" value={form.urea} onChange={handleChange} placeholder="25 mg/dL" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">TGO</label>
-                          <input type="text" name="tgo" value={form.tgo} onChange={handleChange} placeholder="22 U/L" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">TGP</label>
-                          <input type="text" name="tgp" value={form.tgp} onChange={handleChange} placeholder="25 U/L" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-600 mb-0.5">T3-T4-TSH</label>
-                          <input type="text" name="t3_t4_tsh" value={form.t3_t4_tsh} onChange={handleChange} placeholder="Normal / TSH: 2.1" className="w-full p-1.5 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-1">
-                      <label className="block text-[9px] font-bold text-slate-600 mb-0.5">ANTECEDENTES MÉDICOS</label>
-                      <input type="text" name="antecedentes" value={form.antecedentes} onChange={handleChange} placeholder="Ej: Hipertensión, Diabetes..." className="w-full p-2 rounded-lg border border-slate-300 font-bold text-xs bg-white" />
-                    </div>
+                    <label className="block mt-3">
+                      <span className="block text-[10px] font-bold text-slate-700 mb-1">Antecedentes médicos</span>
+                      <input type="text" name="antecedentes" value={form.antecedentes} onChange={handleChange} placeholder="Ej: Hipertensión, diabetes..." className="w-full p-2 rounded-lg border border-slate-300 bg-white font-bold text-xs" />
+                    </label>
                   </div>
                 )}
                 <div className="bg-teal-50/50 p-3.5 rounded-xl border border-teal-200">
