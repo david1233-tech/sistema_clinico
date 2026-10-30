@@ -108,6 +108,26 @@ function fechaTriaje(t: Triaje) {
   return Number.isNaN(parsed.getTime()) ? fecha : parsed.toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+async function prepararFoto(archivo: File): Promise<File> {
+  if (archivo.size <= 3 * 1024 * 1024 && ['image/jpeg', 'image/png', 'image/webp'].includes(archivo.type)) return archivo;
+  const url = URL.createObjectURL(archivo);
+  try {
+    const imagen = new Image();
+    imagen.src = url;
+    await imagen.decode();
+    const escala = Math.min(1, 1800 / Math.max(imagen.naturalWidth, imagen.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(imagen.naturalWidth * escala);
+    canvas.height = Math.round(imagen.naturalHeight * escala);
+    canvas.getContext('2d')?.drawImage(imagen, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+    if (!blob || blob.size > 3 * 1024 * 1024) throw new Error('La foto es demasiado grande. Intente con menor resolución.');
+    return new File([blob], `foto-${Date.now()}.jpg`, { type: 'image/jpeg' });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 function EnfermeriaContent() {
   const searchParams = useSearchParams();
   const dniParam = searchParams.get('dni');
@@ -132,10 +152,12 @@ function EnfermeriaContent() {
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
   const [pendientes, setPendientes] = useState<File[]>([]);
   const [avanceSubida, setAvanceSubida] = useState<{ completados: number; total: number } | null>(null);
-  const [camaraActiva, setCamaraActiva] = useState<boolean>(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const camaraAdjuntoRef = useRef<HTMLInputElement | null>(null);
+  const camaraHistorialRef = useRef<HTMLInputElement | null>(null);
+  const [leyendoHistorial, setLeyendoHistorial] = useState(false);
+  const [mensajeLectura, setMensajeLectura] = useState('');
+  const [zoomImagen, setZoomImagen] = useState(1);
+  const distanciaDedosRef = useRef<{ distancia: number; zoom: number } | null>(null);
   const detalleRequestRef = useRef(0);
   const adjuntosRequestRef = useRef(0);
   const [form, setForm] = useState(crearFormularioTriaje);
@@ -165,48 +187,37 @@ function EnfermeriaContent() {
     }
   }, [dniParam, pacientesRegistrados]);
 
-  const abrirCamara = async () => {
+  const leerFotoHistorial = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const seleccion = e.target.files?.[0];
+    e.target.value = '';
+    if (!seleccion) return;
+    setLeyendoHistorial(true);
+    setMensajeLectura('Leyendo foto del historial...');
     try {
-      setCamaraActiva(true);
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+      const archivo = await prepararFoto(seleccion);
+      const data = new FormData();
+      data.append('archivo', archivo);
+      const res = await fetch('/api/triaje/leer-historial', { method: 'POST', body: data });
+      const resultado = await res.json();
+      if (!res.ok) throw new Error(resultado.error || 'No se pudo leer la foto.');
+      const campos = resultado.campos as Record<string, string>;
+      if (form.dni_paciente && campos.dni_paciente && form.dni_paciente !== campos.dni_paciente) {
+        throw new Error('El DNI de la foto no coincide con el paciente seleccionado. Revise la foto antes de continuar.');
       }
-    } catch (err) {
-      console.error('Error accediendo a la cámara:', err);
-      alert('No se pudo acceder a la cámara.');
-      setCamaraActiva(false);
-    }
-  };
-
-  const cerrarCamara = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    setCamaraActiva(false);
-  };
-
-  const capturarFoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        if (adjuntos.length + pendientes.length >= MAX_ADJUNTOS_TRIAJE) {
-          alert('Se permiten hasta 200 adjuntos por triaje.');
-        } else {
-          canvas.toBlob(blob => {
-            if (blob) setPendientes(prev => [...prev, new File([blob], `foto-${Date.now()}.jpg`, { type: 'image/jpeg' })]);
-          }, 'image/jpeg', 0.85);
-        }
+      if (form.dni_paciente) {
+        delete campos.dni_paciente;
+        if (form.nombre_paciente) delete campos.nombre_paciente;
       }
+      if (registroEditando || registroPendienteId) delete campos.dni_paciente;
+      const reconocidos = Object.keys(campos).length;
+      if (!reconocidos) throw new Error('No se reconocieron datos legibles. Tome una foto más nítida.');
+      setForm(prev => ({ ...prev, ...campos }));
+      setMensajeLectura(`${reconocidos} datos completados. Revise cada valor antes de guardar.`);
+    } catch (error) {
+      setMensajeLectura(error instanceof Error ? error.message : 'No se pudo leer la foto.');
+    } finally {
+      setLeyendoHistorial(false);
     }
-    cerrarCamara();
   };
 
   const fetchTriajes = async () => {
@@ -306,6 +317,22 @@ function EnfermeriaContent() {
     e.target.value = '';
   };
 
+  const handleFotoTriaje = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const seleccion = e.target.files?.[0];
+    e.target.value = '';
+    if (!seleccion) return;
+    if (adjuntos.length + pendientes.length >= MAX_ADJUNTOS_TRIAJE) {
+      alert('Se permiten hasta 200 adjuntos por triaje.');
+      return;
+    }
+    try {
+      const foto = await prepararFoto(seleccion);
+      setPendientes(prev => [...prev, foto]);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'No se pudo preparar la foto.');
+    }
+  };
+
   const cargarAdjuntos = async (id: string | number) => {
     const solicitud = ++adjuntosRequestRef.current;
     const res = await fetch(`/api/triaje/adjuntos?id=${id}`);
@@ -332,6 +359,7 @@ function EnfermeriaContent() {
 
   const abrirAdjunto = (url: string, tipo: string) => {
     setTipoArchivoModal(tipo);
+    setZoomImagen(1);
     setArchivoModal(url);
   };
 
@@ -591,6 +619,15 @@ function EnfermeriaContent() {
               </div>
               
               <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
+                <div className="bg-sky-50 p-3 rounded-xl border border-sky-200">
+                  <p className="m-0 text-[11px] font-extrabold text-sky-900 uppercase">📸 Leer historial con la cámara</p>
+                  <p className="text-xs text-sky-800 my-2">Tome una foto de la ficha clínica para completar los datos principales y opcionales que se puedan leer.</p>
+                  <input ref={camaraHistorialRef} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={leerFotoHistorial} className="hidden" aria-label="Foto del historial" />
+                  <button type="button" onClick={() => camaraHistorialRef.current?.click()} disabled={saving || leyendoHistorial} className="px-3 py-2 bg-sky-800 text-white font-bold text-xs rounded-xl disabled:opacity-50 cursor-pointer">
+                    {leyendoHistorial ? 'Leyendo foto...' : '📸 Tomar foto del historial'}
+                  </button>
+                  {mensajeLectura && <p role="status" className="text-xs text-sky-900 mt-2 mb-0">{mensajeLectura}</p>}
+                </div>
                 <div className="bg-teal-50 p-3 rounded-xl border border-teal-200">
                   <label className="block text-[11px] font-extrabold text-teal-900 mb-1 uppercase tracking-wider">
                     👤 SELECCIONAR PACIENTE REGISTRADO EN RECEPCIÓN
@@ -729,7 +766,7 @@ function EnfermeriaContent() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2.5 mt-2.5">
+                  <div className="grid grid-cols-2 gap-2.5 mt-2.5">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-700 mb-1">T° (°C) *</label>
                       <input
@@ -747,10 +784,6 @@ function EnfermeriaContent() {
                       <label className="block text-[10px] font-bold text-slate-700 mb-1">P/A (mmHg) *</label>
                       <input type="text" name="presion_arterial" value={form.presion_arterial} onChange={handleChange} placeholder="120/80" className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600" required />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-700 mb-1">F. Respiratoria (rpm) *</label>
-                      <input type="number" min="1" name="frecuencia_respiratoria" value={form.frecuencia_respiratoria} onChange={handleChange} placeholder="18" className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600" required />
-                    </div>
                   </div>
                 </div>
                 <p className="m-0 text-xs text-teal-800 font-semibold">
@@ -766,6 +799,10 @@ function EnfermeriaContent() {
                 </button>
                 {mostrarOpcionales && (
                   <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex flex-col gap-3 animate-fadeIn text-xs">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">F. Respiratoria (rpm)</label>
+                      <input type="number" min="1" name="frecuencia_respiratoria" value={form.frecuencia_respiratoria} onChange={handleChange} placeholder="18" className="w-full p-2 rounded-xl border border-slate-300 bg-white font-bold text-xs" />
+                    </div>
                     <div className="border-b border-slate-200 pb-2">
                       <span className="text-[10px] font-black text-teal-800 uppercase tracking-wider block mb-2">
                         💧 COMPOSICIÓN CORPORAL Y METABOLISMO
@@ -898,9 +935,10 @@ function EnfermeriaContent() {
                   </label>
                   
                   <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <input ref={camaraAdjuntoRef} type="file" accept="image/*" capture="environment" onChange={handleFotoTriaje} disabled={saving} className="hidden" aria-label="Foto de triaje" />
                     <button
                       type="button"
-                      onClick={abrirCamara}
+                      onClick={() => camaraAdjuntoRef.current?.click()}
                       disabled={saving}
                       className="w-full sm:w-auto px-3 py-2 bg-teal-800 hover:bg-teal-900 text-white font-extrabold text-xs rounded-xl cursor-pointer flex items-center justify-center gap-1.5 shadow-sm transition-all"
                     >
@@ -915,28 +953,6 @@ function EnfermeriaContent() {
                       className="block w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-200 file:text-slate-800 hover:file:bg-slate-300 cursor-pointer"
                     />
                   </div>
-                  {camaraActiva && (
-                    <div className="mt-3 p-3 bg-slate-900 rounded-xl flex flex-col items-center gap-2 border border-slate-700">
-                      <video ref={videoRef} autoPlay playsInline className="w-full h-48 bg-black rounded-lg object-cover" />
-                      <canvas ref={canvasRef} className="hidden" />
-                      <div className="flex items-center gap-2 w-full justify-center">
-                        <button
-                          type="button"
-                          onClick={capturarFoto}
-                          className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-lg cursor-pointer"
-                        >
-                          📸 Capturar Foto
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cerrarCamara}
-                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold rounded-lg cursor-pointer"
-                        >
-                          ✕ Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  )}
                   <p className="mt-2 text-xs text-slate-600">Hasta 200 fotos o archivos PDF, 3 MB cada uno. Se guardan al guardar el triaje.</p>
                   {avanceSubida && avanceSubida.total > 0 && <p className="mt-1 text-xs font-bold text-teal-800" role="status">Subiendo adjuntos: {avanceSubida.completados} de {avanceSubida.total}</p>}
                   <button type="button" onClick={() => setCarpetaAbierta(true)} className="mt-2 w-full bg-white border border-teal-300 rounded-xl p-3 text-left text-sm font-bold text-teal-900 hover:bg-teal-50 cursor-pointer">
@@ -1168,14 +1184,32 @@ function EnfermeriaContent() {
                 </button>
               </div>
               
-              <div className="p-4 flex-1 overflow-auto flex items-center justify-center bg-slate-100">
+              <div className="p-4 flex-1 overflow-auto bg-slate-100" style={{ touchAction: 'pan-x pan-y' }}
+                onTouchStart={e => {
+                  if (e.touches.length === 2) distanciaDedosRef.current = {
+                    distancia: Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY),
+                    zoom: zoomImagen
+                  };
+                }}
+                onTouchMove={e => {
+                  if (e.touches.length !== 2 || !distanciaDedosRef.current || !tipoArchivoModal.startsWith('image/')) return;
+                  e.preventDefault();
+                  const distancia = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                  setZoomImagen(Math.min(5, Math.max(1, distanciaDedosRef.current.zoom * distancia / distanciaDedosRef.current.distancia)));
+                }}
+                onTouchEnd={() => { distanciaDedosRef.current = null; }}>
                 {tipoArchivoModal.startsWith('image/') ? (
-                  <img src={archivoModal} alt="Archivo ampliado" className="max-h-[60vh] object-contain rounded-lg shadow-md" />
+                  <img src={archivoModal} alt="Archivo ampliado" draggable={false} style={{ width: `${zoomImagen * 100}%`, maxWidth: 'none' }} className="h-auto object-contain rounded-lg shadow-md select-none" />
                 ) : (
                   <iframe src={archivoModal} className="w-full h-[60vh] rounded-lg border border-slate-300 bg-white" title="Documento adjunto" />
                 )}
               </div>
               <div className="bg-white p-4 border-t border-slate-200 flex items-center justify-end gap-3">
+                {tipoArchivoModal.startsWith('image/') && <div className="flex items-center gap-2 mr-auto text-xs text-slate-700">
+                  <button type="button" onClick={() => setZoomImagen(z => Math.max(1, z - 0.5))} className="px-2 py-1 rounded bg-slate-100 font-bold" aria-label="Reducir imagen">−</button>
+                  <span>{Math.round(zoomImagen * 100)}%</span>
+                  <button type="button" onClick={() => setZoomImagen(z => Math.min(5, z + 0.5))} className="px-2 py-1 rounded bg-slate-100 font-bold" aria-label="Ampliar imagen">+</button>
+                </div>}
                 <button
                   type="button"
                   onClick={() => setArchivoModal(null)}

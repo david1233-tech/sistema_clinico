@@ -29,6 +29,10 @@ Para la consulta automática de DNI, configura también `RENIEC_API_URL` (URL HT
 
 La URL HTTPS de Vercel se puede instalar como aplicación web desde el navegador del móvil. La información clínica requiere internet y se comparte mediante la misma base Supabase.
 
+## Lectura de fotos del historial en enfermería
+
+Para completar automáticamente el formulario de triaje desde una foto, configura `OPENAI_API_KEY` como variable de entorno del servidor en Vercel y vuelve a desplegar. La imagen se envía al servicio de OpenAI para extraer los valores legibles; no se guarda como adjunto automáticamente. El personal debe revisar y corregir los datos antes de guardar. Opcionalmente, `OPENAI_VISION_MODEL` permite seleccionar otro modelo compatible con imágenes.
+
 ## Desarrollo local
 
 Instala dependencias con `npm install` y ejecuta `npm run dev`. Crea `.env.local` con las mismas variables que uses en Vercel. Ese archivo está ignorado por Git. Si deseas mantener la antigua instalación MySQL, usa una versión anterior del proyecto: esta versión usa PostgreSQL.
