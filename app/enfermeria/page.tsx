@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { extraerDatosTriaje } from '@/lib/ocr-triaje';
+import { reconocerTextoLocal } from '@/lib/ocr-navegador';
 
 interface Triaje {
   id: string | number;
@@ -229,13 +231,8 @@ function EnfermeriaContent() {
     setTextoVisibleHistorial('');
     try {
       const archivo = await prepararFoto(seleccion, 2600);
-      const data = new FormData();
-      data.append('archivo', archivo);
-      const res = await fetch('/api/triaje/leer-historial', { method: 'POST', body: data });
-      const resultado = await res.json();
-      if (!res.ok) throw new Error(resultado.error || 'No se pudo leer la foto.');
-      const campos = resultado.campos as Record<string, string>;
-      const textoVisible = typeof resultado.texto_visible === 'string' ? resultado.texto_visible : '';
+      const textoVisible = await reconocerTextoLocal(archivo, porcentaje => setMensajeLectura(`Reconociendo texto en este teléfono... ${porcentaje}%`));
+      const campos = extraerDatosTriaje(textoVisible);
       setTextoVisibleHistorial(textoVisible);
       if (form.dni_paciente && campos.dni_paciente && form.dni_paciente !== campos.dni_paciente) {
         throw new Error('El DNI de la foto no coincide con el paciente seleccionado. Revise la foto antes de continuar.');
@@ -660,13 +657,13 @@ function EnfermeriaContent() {
               <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
                 <div className="bg-sky-50 p-3 rounded-xl border border-sky-200">
                   <p className="m-0 text-[11px] font-extrabold text-sky-900 uppercase">📸 Leer historial con la cámara</p>
-                  <p className="text-xs text-sky-800 my-2">Tome una foto de la ficha clínica para completar los datos principales y opcionales que se puedan leer.</p>
+                  <p className="text-xs text-sky-800 my-2">Tome una foto de la ficha clínica. El texto se lee en este teléfono, sin usar saldo de OpenAI. La primera lectura descarga el lector y puede tardar un poco.</p>
                   <input ref={camaraHistorialRef} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={leerFotoHistorial} className="hidden" aria-label="Foto del historial" />
                   <button type="button" onClick={() => camaraHistorialRef.current?.click()} disabled={saving || leyendoHistorial} className="px-3 py-2 bg-sky-800 text-white font-bold text-xs rounded-xl disabled:opacity-50 cursor-pointer">
                     {leyendoHistorial ? 'Leyendo foto...' : '📸 Tomar foto del historial'}
                   </button>
                   {mensajeLectura && <p role="status" className="text-xs text-sky-900 mt-2 mb-0">{mensajeLectura}</p>}
-                  {textoVisibleHistorial && <details className="mt-2 text-xs text-sky-900"><summary className="cursor-pointer font-bold">Ver texto adicional detectado</summary><p className="whitespace-pre-wrap break-words mt-1 mb-0">{textoVisibleHistorial}</p></details>}
+                  {textoVisibleHistorial && <details className="mt-2 text-xs text-sky-900"><summary className="cursor-pointer font-bold">Ver texto reconocido de la foto</summary><p className="whitespace-pre-wrap break-words mt-1 mb-0">{textoVisibleHistorial}</p></details>}
                 </div>
                 <div className="bg-teal-50 p-3 rounded-xl border border-teal-200">
                   <label className="block text-[11px] font-extrabold text-teal-900 mb-1 uppercase tracking-wider">

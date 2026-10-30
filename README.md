@@ -31,7 +31,7 @@ La URL HTTPS de Vercel se puede instalar como aplicación web desde el navegador
 
 ## Lectura de fotos del historial en enfermería
 
-Para completar automáticamente el formulario de triaje desde una foto, configura `OPENAI_API_KEY` como variable de entorno del servidor en Vercel y vuelve a desplegar. La imagen se envía al servicio de OpenAI para extraer los valores legibles; no se guarda como adjunto automáticamente. El personal debe revisar y corregir los datos antes de guardar. Opcionalmente, `OPENAI_VISION_MODEL` permite seleccionar otro modelo compatible con imágenes.
+El formulario de triaje puede completar datos desde una foto con OCR en el navegador mediante Tesseract.js. No requiere clave ni saldo de OpenAI y la foto no se envía al servicio de OpenAI. La primera lectura descarga el motor OCR y el idioma español desde una CDN, por lo que necesita conexión a internet. El texto reconocido se muestra para revisión; los datos extraídos pueden tener errores, especialmente con letra manuscrita o imágenes borrosas, y deben corregirse antes de guardar. La foto no se guarda como adjunto automáticamente.
 
 ## Desarrollo local
 
