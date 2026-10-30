@@ -16,14 +16,14 @@ const ETIQUETAS: { campo: Campo; patron: RegExp }[] = [
   { campo: 'talla', patron: /\b(?:talla|estatura|altura)\b/g },
   { campo: 'peso', patron: /\bpeso\b/g },
   { campo: 'imc', patron: /\b(?:imc|indice\s+de\s+masa\s+corporal)\b/g },
-  { campo: 'frecuencia_respiratoria', patron: /\b(?:f\.?\s*respiratoria|frecuencia\s+respiratoria|fr)\b/g },
+  { campo: 'frecuencia_respiratoria', patron: /\b(?:f\.?\s*resp(?:iratoria)?|frecuencia\s+respiratoria|fr)\b/g },
   { campo: 'pulso', patron: /\b(?:pulso|f\.?\s*cardiaca|frecuencia\s+cardiaca|fc)\b/g },
-  { campo: 'so2', patron: /\b(?:spo?2|saturacion(?:\s+de\s+oxigeno)?)\b/g },
+  { campo: 'so2', patron: /\b(?:spo?2|so2|saturacion(?:\s+de\s+oxigeno)?)\b/g },
   { campo: 'temperatura', patron: /\b(?:temperatura|temp)\b|\bt\s*°/g },
-  { campo: 'presion_arterial', patron: /\b(?:p\s*\/?\s*a|presion\s+arterial|tension\s+arterial)\b/g },
-  { campo: 'grasa_visceral', patron: /\b(?:g\.?\s*visceral|grasa\s+visceral)\b/g },
+  { campo: 'presion_arterial', patron: /\b(?:p\s*\/?\s*a|presion(?:\s+arterial)?|tension\s+arterial)\b/g },
+  { campo: 'grasa_visceral', patron: /\b(?:g\.?\s*visc?eral|grasa\s+visc?eral)\b/g },
   { campo: 'grasa_porcentaje', patron: /\bgrasa(?:\s+corporal)?\s*%|\bgrasa\s+corporal\b|\bporcentaje\s+de\s+grasa\b/g },
-  { campo: 'musculo_esqueletico_porcentaje', patron: /\b(?:m\.?\s*mus\.?\s*eque\s*%?|musculo\s+esqueletico\s*%?)\b/g },
+  { campo: 'musculo_esqueletico_porcentaje', patron: /\b(?:m\.?\s*mus[.\s]*\s*(?:eque|esque)\s*%?|musculo\s+esqueletico\s*%?)\b/g },
   { campo: 'musculos_porcentaje', patron: /\bmusculos?\s*%?\b/g },
   { campo: 'agua_porcentaje', patron: /\bagua\s*%?\b/g },
   { campo: 'metabolismo', patron: /\b(?:metabolismo(?:\s+basal)?|tasa\s+metabolica)\b/g },
@@ -48,22 +48,42 @@ const ETIQUETAS: { campo: Campo; patron: RegExp }[] = [
 ];
 
 function normalizar(texto: string) {
-  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/₂/g, '2').toLowerCase();
 }
 
+const RANGOS_LECTURA: Partial<Record<Campo, [number, number]>> = {
+  edad: [0, 120], talla: [30, 250], peso: [1, 500], imc: [5, 100],
+  pulso: [1, 300], so2: [1, 100], temperatura: [20, 45],
+  frecuencia_respiratoria: [1, 100], hb: [1, 30],
+  grasa_porcentaje: [0, 100], grasa_visceral: [0, 100],
+  musculo_esqueletico_porcentaje: [0, 100], musculos_porcentaje: [0, 100],
+  agua_porcentaje: [0, 100], proteina: [0, 100],
+  edad_metabolica: [0, 120], circunferencia_abdominal: [20, 300],
+  hb_glicosilada: [1, 30], vcm: [30, 150],
+};
+
 function extraerValor(campo: Campo, segmento: string): string {
-  const limpio = segmento.replace(/^[\s:;=,.-]+/, '').trim();
+  const limpio = segmento
+    .replace(/^[\s:;=,.-]+/, '')
+    .replace(/^(?:\((?:kg|cm|m|%|mmhg|rpm|lpm|bpm|g\/dl|mg\/dl|°c)\)|(?:kg|cm|mmhg|rpm|lpm|bpm|g\/dl|mg\/dl|%|°c))\s*[:=]?\s*/i, '')
+    .trim();
   if (!limpio) return '';
   if (campo === 'nombre_paciente' || campo === 'antecedentes' || campo === 'examenes_solicitados' || campo === 't3_t4_tsh') {
     const texto = limpio.replace(/[|;]+$/, '').trim().slice(0, 150);
-    return campo === 'nombre_paciente' && !/[a-záéíóúñ]{2}/i.test(texto) ? '' : texto;
+    return campo === 'nombre_paciente' && (!/^[a-záéíóúñ]/i.test(texto) || !/[a-záéíóúñ]{2}/i.test(texto)) ? '' : texto;
   }
-  if (campo === 'dni_paciente') return limpio.match(/\b\d{8}\b/)?.[0] || '';
-  if (campo === 'presion_arterial') return limpio.match(/\b\d{2,3}\s*[/|]\s*\d{2,3}\b/)?.[0].replace(/[\s|]/g, '').replace('|', '/') || '';
-  const valor = limpio.match(/[+-]?\d{1,5}(?:[.,]\d{1,3})?/);
+  if (campo === 'dni_paciente') return limpio.match(/^\d{8}\b/)?.[0] || '';
+  if (campo === 'presion_arterial') {
+    const presion = limpio.match(/^(\d{2,3})\s*[/|]\s*(\d{2,3})\b/);
+    if (!presion || Number(presion[1]) < 30 || Number(presion[1]) > 300 || Number(presion[2]) < 20 || Number(presion[2]) > 200) return '';
+    return `${presion[1]}/${presion[2]}`;
+  }
+  const valor = limpio.match(/^[+-]?\d{1,5}(?:[.,]\d{1,3})?/);
   if (!valor) return '';
-  const numero = valor[0].replace(',', '.');
-  if (campo === 'talla' && /^\d[.,]\d{1,2}\s*m(?:\b|$)/i.test(limpio)) return String(Math.round(Number(numero) * 100));
+  let numero = valor[0].replace(',', '.');
+  if (campo === 'talla' && Number(numero) < 3) numero = String(Math.round(Number(numero) * 100));
+  const rango = RANGOS_LECTURA[campo];
+  if (rango && (Number(numero) < rango[0] || Number(numero) > rango[1])) return '';
   return numero;
 }
 
@@ -77,11 +97,26 @@ export function extraerDatosTriaje(texto: string): Partial<Record<Campo, string>
       Array.from(normalizada.matchAll(patron), coincidencia => ({ campo, inicio: coincidencia.index, fin: coincidencia.index + coincidencia[0].length }))
     ).sort((a, b) => a.inicio - b.inicio || b.fin - a.fin);
     const etiquetas = hallazgos.filter((actual, indice) => !hallazgos.slice(0, indice).some(otra => otra.inicio <= actual.inicio && otra.fin > actual.inicio));
+    const sinValoresEnLinea = etiquetas.length > 1 && etiquetas.every((etiqueta, indice) =>
+      !/\d/.test(linea.slice(etiqueta.fin, etiquetas[indice + 1]?.inicio ?? linea.length))
+    );
+    if (sinValoresEnLinea && lineas[i + 1]) {
+      const valores = lineas[i + 1].match(/\d{2,3}\s*[/|]\s*\d{2,3}|[+-]?\d+(?:[.,]\d+)?/g) || [];
+      if (valores.length === etiquetas.length) {
+        etiquetas.forEach((etiqueta, indice) => {
+          const valor = extraerValor(etiqueta.campo, valores[indice]);
+          if (valor && !campos[etiqueta.campo]) campos[etiqueta.campo] = valor;
+        });
+        continue;
+      }
+    }
     etiquetas.forEach((etiqueta, indice) => {
       const siguiente = etiquetas[indice + 1]?.inicio ?? linea.length;
-      let segmento = linea.slice(etiqueta.fin, siguiente);
-      if (!segmento.trim() && lineas[i + 1] && /^\s*[:=]?[\s\d.,/+%-]/.test(lineas[i + 1])) segmento = lineas[i + 1];
-      const valor = extraerValor(etiqueta.campo, segmento);
+      const segmento = linea.slice(etiqueta.fin, siguiente);
+      let valor = extraerValor(etiqueta.campo, segmento);
+      if (!valor && /^[\s:;=().,%°/-]*(?:(?:kg|cm|mmhg|rpm|lpm|g\/dl)[\s:;=().,%°/-]*)?$/i.test(segmento) && lineas[i + 1] && /^[+-]?\d{1,5}(?:[.,]\d+)?(?:\s*[/|]\s*\d{2,3})?(?:\s*(?:kg|cm|mmhg|rpm|lpm|g\/dl|%|°c))?\s*$/i.test(lineas[i + 1])) {
+        valor = extraerValor(etiqueta.campo, lineas[i + 1]);
+      }
       if (valor && !campos[etiqueta.campo]) campos[etiqueta.campo] = valor;
     });
   }

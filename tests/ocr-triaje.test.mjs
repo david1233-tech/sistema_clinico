@@ -17,7 +17,12 @@ test('asocia signos vitales y datos opcionales de una ficha impresa', () => {
   assert.equal(datos.dni_paciente, '12345678');
   assert.equal(datos.nombre_paciente, 'Ana Perez');
   assert.equal(datos.talla, '165');
+  assert.equal(datos.edad, '42');
   assert.equal(datos.peso, '68.5');
+  assert.equal(datos.imc, '25.2');
+  assert.equal(datos.pulso, '72');
+  assert.equal(datos.so2, '98');
+  assert.equal(datos.temperatura, '36.5');
   assert.equal(datos.presion_arterial, '120/80');
   assert.equal(datos.grasa_porcentaje, '22.5');
   assert.equal(datos.grasa_visceral, '8');
@@ -50,5 +55,40 @@ test('no asigna un DNI o un valor clínico sin etiqueta', () => {
   assert.equal(datos.dni_paciente, undefined);
   assert.equal(datos.hb, undefined);
   assert.equal(datos.hb_glicosilada, undefined);
+});
+
+test('lee una fila de valores bajo sus encabezados', () => {
+  const datos = extraerDatosTriaje('Peso (kg) Talla (cm) IMC\n68.5 165 25.2\nGrasa% Agua% G. visceral\n22 55 8');
+  assert.equal(datos.peso, '68.5');
+  assert.equal(datos.talla, '165');
+  assert.equal(datos.imc, '25.2');
+  assert.equal(datos.grasa_porcentaje, '22');
+  assert.equal(datos.agua_porcentaje, '55');
+  assert.equal(datos.grasa_visceral, '8');
+});
+
+test('omite cifras claramente erróneas y no toma valores lejanos a la etiqueta', () => {
+  const datos = extraerDatosTriaje('Edad 2026\nPeso lectura fallida 68\nSO2 987\nTemperatura 36.8');
+  assert.equal(datos.edad, undefined);
+  assert.equal(datos.peso, undefined);
+  assert.equal(datos.so2, undefined);
+  assert.equal(datos.temperatura, '36.8');
+});
+
+test('acepta abreviaturas y unidades entre etiqueta y cifra', () => {
+  const datos = extraerDatosTriaje('Peso kg: 68,5\nTalla cm: 165\nF. Resp rpm: 18\nHb g/dL: 13,4\nPresión mmHg: 120/80\nSO₂ % 98');
+  assert.equal(datos.peso, '68.5');
+  assert.equal(datos.talla, '165');
+  assert.equal(datos.frecuencia_respiratoria, '18');
+  assert.equal(datos.hb, '13.4');
+  assert.equal(datos.presion_arterial, '120/80');
+  assert.equal(datos.so2, '98');
+});
+
+test('lee un valor en la línea siguiente de su etiqueta', () => {
+  const datos = extraerDatosTriaje('Peso (kg)\n68.5 kg\nGrasa %\n22%\nP/A\n120/80');
+  assert.equal(datos.peso, '68.5');
+  assert.equal(datos.grasa_porcentaje, '22');
+  assert.equal(datos.presion_arterial, '120/80');
 });
 

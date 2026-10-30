@@ -1,5 +1,9 @@
 type ResultadoOCR = { data: { text: string } };
-type WorkerOCR = { recognize: (archivo: File) => Promise<ResultadoOCR>; terminate: () => Promise<void> };
+type WorkerOCR = {
+  recognize: (archivo: File, opciones?: { rotateAuto?: boolean }) => Promise<ResultadoOCR>;
+  setParameters: (parametros: { tessedit_pageseg_mode: string; preserve_interword_spaces: string }) => Promise<unknown>;
+  terminate: () => Promise<void>;
+};
 type TesseractBrowser = {
   createWorker: (idioma: string, modo: number, opciones: { logger: (avance: { progress?: number }) => void }) => Promise<WorkerOCR>;
 };
@@ -50,7 +54,8 @@ export async function reconocerTextoLocal(archivo: File, progreso: (porcentaje: 
     }
   });
   try {
-    const resultado = await worker.recognize(archivo);
+    await worker.setParameters({ tessedit_pageseg_mode: '3', preserve_interword_spaces: '1' });
+    const resultado = await worker.recognize(archivo, { rotateAuto: true });
     return resultado.data.text.trim();
   } finally {
     await worker.terminate();
