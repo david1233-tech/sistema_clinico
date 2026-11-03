@@ -69,15 +69,8 @@ export default function NuevoPacienteModal() {
       });
       const data = await res.json();
       if (res.ok) {
-        setMensaje({ tipo: 'exito', texto: '¡Paciente registrado con éxito! Actualizando módulos...' });
-        
-        // 1. Invalidamos las rutas en caché de Next.js
-        router.refresh();
-
-        // 2. Redirigimos y forzamos la actualización completa para que aparezca en todos lados al instante
-        setTimeout(() => {
-          router.push(`/recepcion?dni=${formData.dni}`);
-        }, 1000);
+        setOpen(false);
+        router.push(`/recepcion?dni=${encodeURIComponent(data.dni)}`);
 
       } else {
         setMensaje({ tipo: 'error', texto: data.error || 'Ocurrió un error' });
@@ -251,4 +244,3 @@ export default function NuevoPacienteModal() {
     </>
   );
 }
-
