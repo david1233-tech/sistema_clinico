@@ -22,6 +22,7 @@ En el proyecto abre **Settings → Environment Variables**. Agrega las siguiente
 | `DOCTORA_PASSWORD` | Contraseña de `SusanaVital` |
 | `ENFERMERA_PASSWORD` | Contraseña de `PilarVital` |
 | `RECEPCION_PASSWORD` | Contraseña de `GabyVital` |
+| `WARCRY_PASSWORD` | Contraseña de `Warcry86`; acceso a Admisión y Pacientes, Triaje y Signos Vitales, Agenda y Citas, Vitaminas y Controles |
 
 Genera un `AUTH_SECRET` con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Las contraseñas se configuran en Vercel, nunca en el repositorio público. Después de guardar las variables, abre **Deployments** y ejecuta **Redeploy** en el despliegue más reciente. Si el proyecto está conectado a GitHub, Vercel también puede desplegar los cambios nuevos de `main` automáticamente, pero las variables agregadas requieren un despliegue nuevo.
 
@@ -36,4 +37,3 @@ El formulario de triaje puede completar datos desde una foto con OCR en el naveg
 ## Desarrollo local
 
 Instala dependencias con `npm install` y ejecuta `npm run dev`. Crea `.env.local` con las mismas variables que uses en Vercel. Ese archivo está ignorado por Git. Si deseas mantener la antigua instalación MySQL, usa una versión anterior del proyecto: esta versión usa PostgreSQL.
-
