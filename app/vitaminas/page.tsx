@@ -52,6 +52,7 @@ Dbet 115
 Denova - Glutathione
 Dfes 106
 Drenatox
+Drenador Hepatico
 Echinacea
 Echinacea Lote 2
 Estomago
@@ -157,6 +158,7 @@ function VitaminasPageContent() {
   const [busqueda, setBusqueda] = useState<string>('');
   const [busquedaVitamina, setBusquedaVitamina] = useState('');
   const [mostrarCatalogo, setMostrarCatalogo] = useState(false);
+  const [viaOpcion, setViaOpcion] = useState('');
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
@@ -266,9 +268,13 @@ function VitaminasPageContent() {
 
   const handleSeleccionarPaciente = (p: Paciente) => {
     if (saving) return;
+    if (p.dni_paciente === pacienteSeleccionado?.dni_paciente) return;
+    if ((registroEditando || Object.values(formVitamina).some(Boolean)) &&
+      !confirm('Los datos del formulario que aún no guardó se perderán. ¿Cambiar de paciente?')) return;
     setPacienteSeleccionado(p);
     setRegistroEditando(null);
     setFormVitamina({ vitaminaNombre: '', dosis: '', via: '', observaciones: '' });
+    setViaOpcion('');
     setBusquedaVitamina('');
     setMostrarCatalogo(false);
     
@@ -279,24 +285,6 @@ function VitaminasPageContent() {
     window.dispatchEvent(new Event('paciente_activo_changed'));
   };
 
-  const handleEliminarPaciente = async (id: string | number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (confirm('⚠️ ¿Estás seguro de eliminar este registro de la base de datos?')) {
-      try {
-        await fetch(`/api/triaje?id=${id}`, { method: 'DELETE' });
-        
-        const listaFiltrada = pacientes.filter(p => p.id !== id);
-        setPacientes(listaFiltrada);
-        if (pacienteSeleccionado?.id === id) {
-          setPacienteSeleccionado(listaFiltrada.length > 0 ? listaFiltrada[0] : null);
-        }
-      } catch (err) {
-        console.error('Error al eliminar el registro:', err);
-        setPacientes(prev => prev.filter(p => p.id !== id));
-      }
-    }
-  };
-
   const handleLimpiarFormulario = () => {
     setFormVitamina({
       vitaminaNombre: '',
@@ -304,6 +292,7 @@ function VitaminasPageContent() {
       via: '',
       observaciones: ''
     });
+    setViaOpcion('');
     setBusquedaVitamina('');
     setMostrarCatalogo(false);
   };
@@ -317,6 +306,7 @@ function VitaminasPageContent() {
       via: tratamiento.via || '',
       observaciones: tratamiento.observaciones || ''
     });
+    setViaOpcion(['Endovenosa', 'Intramuscular'].includes(tratamiento.via) ? tratamiento.via : tratamiento.via ? 'Otra' : '');
     setBusquedaVitamina('');
     setMostrarCatalogo(false);
     document.getElementById('formulario-vitamina')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -419,6 +409,7 @@ function VitaminasPageContent() {
         setPacienteSeleccionado(pacienteSinVitamina);
         setRegistroEditando(null);
         setFormVitamina({ vitaminaNombre: '', dosis: '', via: '', observaciones: '' });
+        setViaOpcion('');
       } catch (err) {
         console.error('Error desmarcando vitamina:', err);
         alert(err instanceof Error ? err.message : 'No se pudo actualizar el tratamiento');
@@ -437,10 +428,10 @@ function VitaminasPageContent() {
   const opcionesVitamina = CATALOGO_VITAMINAS.filter(nombre => normalizarBusqueda(nombre).startsWith(normalizarBusqueda(busquedaVitamina)));
 
   return (
-    <div className="flex min-h-screen bg-slate-100 font-sans text-slate-900">
+    <div className="flex min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50 font-sans text-slate-900">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 md:ml-64 transition-all">
-        <header className="h-16 md:h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8 sticky top-0 z-20 shadow-sm">
+        <header className="h-16 md:h-20 bg-white/90 border-b border-teal-100 flex items-center justify-between px-4 md:px-8 sticky top-0 z-20 shadow-sm backdrop-blur">
           <span className="text-xs md:text-sm text-slate-500 font-medium truncate">
             Módulo Médico / <strong className="text-slate-900">Tratamientos y Vitaminas</strong>
           </span>
@@ -449,7 +440,7 @@ function VitaminasPageContent() {
           </span>
         </header>
 
-        <main className="p-4 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto w-full">
+        <main className="p-4 md:p-8 flex flex-col gap-6 max-w-[1500px] mx-auto w-full">
           <div>
             <h1 className="m-0 text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
               💉 Registro de Vitaminas y Sueros
@@ -460,21 +451,21 @@ function VitaminasPageContent() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
-              <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-900 flex items-center justify-center text-xl shrink-0">👥</div>
+            <div className="bg-white border border-sky-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+              <div className="w-11 h-11 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center text-xl shrink-0">👥</div>
               <div>
                 <span className="text-[11px] text-slate-500 font-extrabold uppercase">Total Ingresados</span>
                 <h3 className="m-0 text-xl font-black text-slate-900">{pacientes.length}</h3>
               </div>
             </div>
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+            <div className="bg-white border border-emerald-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
               <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl shrink-0">🧪</div>
               <div>
                 <span className="text-[11px] text-slate-500 font-extrabold uppercase">Tratamientos Aplicados</span>
                 <h3 className="m-0 text-xl font-black text-emerald-700">{totalAplicados}</h3>
               </div>
             </div>
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+            <div className="bg-white border border-amber-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
               <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-xl shrink-0">⏳</div>
               <div>
                 <span className="text-[11px] text-slate-500 font-extrabold uppercase">Pendientes Relleno</span>
@@ -483,7 +474,7 @@ function VitaminasPageContent() {
             </div>
           </div>
 
-          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 flex items-center gap-3 shadow-sm">
+          <div className="bg-white p-3.5 rounded-2xl border border-sky-200 flex items-center gap-3 shadow-sm">
             <span className="text-lg">🔍</span>
             <input
               type="text"
@@ -502,13 +493,13 @@ function VitaminasPageContent() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start">
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-              <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-4 text-white">
+          <div className="flex flex-col gap-6">
+            <div className="bg-white rounded-2xl border border-sky-200 overflow-hidden shadow-sm">
+              <div className="bg-gradient-to-r from-sky-700 via-teal-700 to-emerald-700 p-4 text-white">
                 <h3 className="m-0 text-sm md:text-base font-extrabold text-white">👥 Lista de Pacientes</h3>
-                <p className="m-0 text-xs text-slate-400">{pacientesFiltrados.length} encontrados</p>
+                <p className="m-0 text-xs text-sky-100">{pacientesFiltrados.length} encontrados · Seleccione una tarjeta para ver su historial</p>
               </div>
-              <div className="p-3 flex flex-col gap-2.5 max-h-[420px] lg:max-h-[520px] overflow-y-auto">
+              <div className="p-4 flex gap-3 overflow-x-auto">
                 {loading ? (
                   <p className="text-center py-5 text-slate-500 text-xs">Cargando lista unificada...</p>
                 ) : pacientesFiltrados.length === 0 ? (
@@ -520,10 +511,10 @@ function VitaminasPageContent() {
                       <div
                         key={p.id}
                         onClick={() => handleSeleccionarPaciente(p)}
-                        className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col gap-2 ${
+                        className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col gap-2 min-w-[235px] w-[260px] shrink-0 ${
                           isSelected 
-                            ? 'border-teal-500 bg-teal-50/70 shadow-sm' 
-                            : 'border-slate-200 hover:bg-slate-50'
+                            ? 'border-teal-500 bg-teal-50 shadow-md ring-2 ring-teal-100' 
+                            : 'border-sky-100 bg-sky-50/40 hover:border-teal-300 hover:bg-teal-50/50'
                         }`}
                       >
                         <div className="flex justify-between items-start gap-2">
@@ -535,14 +526,6 @@ function VitaminasPageContent() {
                               DNI: {p.dni_paciente}
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={(e) => handleEliminarPaciente(p.id, e)}
-                            title="Eliminar registro"
-                            className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg p-1.5 text-xs font-bold cursor-pointer transition-all shrink-0"
-                          >
-                            🗑️
-                          </button>
                         </div>
 
                         {p.aplicaVitamina ? (
@@ -578,8 +561,8 @@ function VitaminasPageContent() {
 
             <div className="flex flex-col gap-6 w-full min-w-0">
               {pacienteSeleccionado ? (
-                <div className="flex flex-col gap-6 animate-fadeIn">
-                  <div className="bg-white rounded-2xl border border-slate-200 p-5 md:p-6 shadow-sm">
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] gap-6 items-start animate-fadeIn">
+                  <div className="bg-white rounded-2xl border border-teal-200 p-5 md:p-6 shadow-sm xl:col-span-2">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div>
                         <span className="text-[11px] font-extrabold text-teal-600 uppercase tracking-wider">
@@ -615,8 +598,8 @@ function VitaminasPageContent() {
                     </div>
                   </div>
 
-                  <form id="formulario-vitamina" onSubmit={handleGuardarVitamina} className="bg-white rounded-2xl border border-slate-200 p-5 md:p-6 shadow-sm flex flex-col gap-4 scroll-mt-24">
-                    <div className="bg-gradient-to-br from-teal-600 to-teal-800 p-4 rounded-xl text-white flex items-center gap-3">
+                  <form id="formulario-vitamina" onSubmit={handleGuardarVitamina} className="bg-white rounded-2xl border border-teal-200 p-5 md:p-6 shadow-sm flex flex-col gap-4 scroll-mt-24 min-w-0">
+                    <div className="bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 p-4 rounded-xl text-white flex items-center gap-3">
                       <span className="text-2xl">🧪</span>
                       <div>
                         <h3 className="m-0 text-sm md:text-base font-extrabold text-white">{registroEditando ? 'Editar vitamina o suero guardado' : 'Especificación de Vitaminas e Inyectables'}</h3>
@@ -689,16 +672,37 @@ function VitaminasPageContent() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
+                      <label htmlFor="via-vitamina" className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
                         VÍA DE ADMINISTRACIÓN
                       </label>
-                      <input
-                        type="text"
-                        value={formVitamina.via}
-                        onChange={(e) => setFormVitamina({ ...formVitamina, via: e.target.value })}
-                        placeholder="Escriba la vía (ej. Endovenosa EV, Intramuscular IM, etc.)"
-                        className="w-full p-3 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600 focus:bg-white"
-                      />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <select
+                          id="via-vitamina"
+                          value={viaOpcion}
+                          onChange={(e) => {
+                            const opcion = e.target.value;
+                            setViaOpcion(opcion);
+                            setFormVitamina(prev => ({ ...prev, via: opcion === 'Otra' ? '' : opcion }));
+                          }}
+                          required
+                          className="w-full p-3 rounded-xl border border-teal-200 bg-white font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600"
+                        >
+                          <option value="">Seleccionar vía...</option>
+                          <option value="Endovenosa">Endovenosa</option>
+                          <option value="Intramuscular">Intramuscular</option>
+                          <option value="Otra">Otra (escribir)</option>
+                        </select>
+                        {viaOpcion === 'Otra' && (
+                          <input
+                            type="text"
+                            value={formVitamina.via}
+                            onChange={(e) => setFormVitamina(prev => ({ ...prev, via: e.target.value }))}
+                            placeholder="Escriba otra vía de administración"
+                            required
+                            className="w-full p-3 rounded-xl border border-teal-200 bg-white font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600"
+                          />
+                        )}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
@@ -735,7 +739,7 @@ function VitaminasPageContent() {
                       </button>
                     </div>
                   </form>
-                  <div className="bg-white rounded-2xl border border-slate-200 p-5 md:p-6 shadow-sm">
+                  <div className="bg-white rounded-2xl border border-sky-200 p-5 md:p-6 shadow-sm min-w-0">
                     <h3 className="m-0 text-sm md:text-base font-extrabold text-teal-900">Historial de vitaminas y sueros ({tratamientosPaciente.length})</h3>
                     {tratamientosPaciente.length === 0 ? (
                       <p className="text-xs text-slate-500 mb-0">Este paciente aún no tiene tratamientos guardados.</p>
