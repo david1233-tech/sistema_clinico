@@ -51,6 +51,39 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PUT(request: Request) {
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 });
+  }
+
+  const dni = String(body.dni ?? '').trim();
+  const nombre = String(body.nombre ?? '').trim();
+  const telefono = String(body.telefono ?? '').trim();
+  const direccion = String(body.direccion ?? '').trim();
+  const genero = String(body.genero ?? '').trim();
+  const edadTexto = String(body.edad ?? '').trim();
+  const edad = edadTexto === '' ? null : Number(edadTexto);
+
+  if (!/^\d{8}$/.test(dni) || !nombre || nombre.length > 200 || telefono.length > 30 || direccion.length > 255 || genero.length > 30 ||
+      (edad !== null && (!Number.isInteger(edad) || edad < 0 || edad > 130))) {
+    return NextResponse.json({ error: 'Revise el DNI, nombre y edad del paciente.' }, { status: 400 });
+  }
+
+  try {
+    const [result] = await pool.execute<ResultSetHeader>(
+      'UPDATE pacientes SET nombre = ?, telefono = ?, edad = ?, genero = ?, direccion = ? WHERE dni = ?',
+      [nombre, telefono || null, edad, genero || null, direccion || null, dni]
+    );
+    if (!result.affectedRows) return NextResponse.json({ error: 'Paciente no encontrado' }, { status: 404 });
+    return NextResponse.json({ success: true, dni, nombre });
+  } catch (error) {
+    return databaseError(error);
+  }
+}
+
 export async function DELETE(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
@@ -67,4 +100,3 @@ export async function DELETE(request: Request) {
     return databaseError(error);
   }
 }
-
