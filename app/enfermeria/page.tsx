@@ -79,9 +79,13 @@ const CAMPOS_DETALLE: { campo: keyof Triaje; etiqueta: string }[] = [
   { campo: 'observaciones', etiqueta: 'Observaciones' }
 ];
 
-const DATOS_OPCIONALES_ORDENADOS = [
+const DATOS_OPCIONALES_PRIMERA_COLUMNA = [
+  { campo: 'imc', etiqueta: 'IMC', ejemplo: 'Ej: 24.5' },
   { campo: 'grasa_porcentaje', etiqueta: 'Grasa %', ejemplo: 'Ej: 22%' },
   { campo: 'grasa_visceral', etiqueta: 'G. Visceral', ejemplo: 'Ej: 8' },
+] as const;
+
+const DATOS_OPCIONALES_ORDENADOS = [
   { campo: 'musculo_esqueletico_porcentaje', etiqueta: 'M.MusEque%', ejemplo: 'Ej: 30%' },
   { campo: 'musculos_porcentaje', etiqueta: 'Músculos%', ejemplo: 'Ej: 40%' },
   { campo: 'agua_porcentaje', etiqueta: 'Agua %', ejemplo: 'Ej: 55%' },
@@ -687,10 +691,82 @@ function EnfermeriaContent() {
                   </select>
                 </div>
                 <div className="border-t border-slate-200 pt-3">
-                  <span className="text-[11px] font-extrabold text-teal-800 uppercase block mb-2 tracking-wider">
-                    DATOS PRINCIPALES (OBLIGATORIOS)
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-2.5">
+                  <span className="text-[11px] font-extrabold text-teal-800 uppercase block mb-2 tracking-wider">DATOS DEL PACIENTE</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5">
+                    <div className="lg:col-span-2">
+                      <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase">
+                        NOMBRE PACIENTE *
+                      </label>
+                      <input
+                        type="text"
+                        name="nombre_paciente"
+                        value={form.nombre_paciente}
+                        onChange={handleChange}
+                        placeholder="Escribe el nombre..."
+                        className="w-full p-2.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs outline-none focus:border-teal-600 focus:bg-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase">
+                        DNI PACIENTE * {buscandoDni && <span className="text-teal-600 font-bold">(buscando...)</span>}
+                      </label>
+                      <input
+                        type="text"
+                        name="dni_paciente"
+                        value={form.dni_paciente}
+                        onChange={handleChange}
+                        disabled={saving || Boolean(registroPendienteId)}
+                        placeholder="Ej: 71234567"
+                        className="w-full p-2.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs outline-none focus:border-teal-600 focus:bg-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">EDAD *</label>
+                      <input
+                        type="number"
+                        name="edad"
+                        value={form.edad}
+                        onChange={handleChange}
+                        readOnly={Boolean(!registroEditando && pacientesRegistrados.find(p => String(p.dni || p.dni_paciente) === form.dni_paciente)?.edad)}
+                        placeholder="Ej: 30"
+                        className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">TALLA (cm) *</label>
+                      <input
+                        type="number"
+                        name="talla"
+                        value={form.talla}
+                        onChange={handleChange}
+                        placeholder="Ej: 165"
+                        className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">PESO (kg) *</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        pattern="[0-9]+([.][0-9]{1,2})?"
+                        title="Ingrese el peso con punto decimal, por ejemplo 68.5"
+                        name="peso"
+                        value={form.peso}
+                        onChange={handleChange}
+                        placeholder="Ej: 68.5"
+                        className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t border-slate-200 pt-3">
+                  <span className="text-[11px] font-extrabold text-teal-800 uppercase block mb-2 tracking-wider">DATOS PRINCIPALES (OBLIGATORIOS)</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-700 mb-1">P/A (mmHg) *</label>
                       <input type="text" name="presion_arterial" value={form.presion_arterial} onChange={handleChange} placeholder="120/80" className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600" required />
@@ -733,94 +809,6 @@ function EnfermeriaContent() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-2.5">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-700 mb-1">TALLA (cm) *</label>
-                      <input
-                        type="number"
-                        name="talla"
-                        value={form.talla}
-                        onChange={handleChange}
-                        placeholder="Ej: 165"
-                        className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-700 mb-1">PESO (kg) *</label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        pattern="[0-9]+([.][0-9]{1,2})?"
-                        title="Ingrese el peso con punto decimal, por ejemplo 68.5"
-                        name="peso"
-                        value={form.peso}
-                        onChange={handleChange}
-                        placeholder="Ej: 68.5"
-                        className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-700 mb-1">IMC *</label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        pattern="[0-9]+([.][0-9]{1,2})?"
-                        title="Ingrese el IMC manualmente, por ejemplo 24.5"
-                        name="imc"
-                        value={form.imc}
-                        onChange={handleChange}
-                        placeholder="Ej: 24.5"
-                        className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs outline-none focus:border-teal-600 focus:bg-white"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-700 mb-1">EDAD *</label>
-                      <input
-                        type="number"
-                        name="edad"
-                        value={form.edad}
-                        onChange={handleChange}
-                        readOnly={Boolean(!registroEditando && pacientesRegistrados.find(p => String(p.dni || p.dni_paciente) === form.dni_paciente)?.edad)}
-                        placeholder="Ej: 30"
-                        className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2.5">
-                    <div>
-                    <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase">
-                      DNI PACIENTE * {buscandoDni && <span className="text-teal-600 font-bold">(buscando...)</span>}
-                    </label>
-                    <input
-                      type="text"
-                      name="dni_paciente"
-                      value={form.dni_paciente}
-                      onChange={handleChange}
-                      disabled={saving || Boolean(registroPendienteId)}
-                      placeholder="Ej: 71234567"
-                      className="w-full p-2.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs outline-none focus:border-teal-600 focus:bg-white"
-                      required
-                    />
-                  </div>
-                    <div>
-                    <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase">
-                      NOMBRE PACIENTE *
-                    </label>
-                    <input
-                      type="text"
-                      name="nombre_paciente"
-                      value={form.nombre_paciente}
-                      onChange={handleChange}
-                      placeholder="Escribe el nombre..."
-                      className="w-full p-2.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs outline-none focus:border-teal-600 focus:bg-white"
-                      required
-                    />
-                  </div>
-                  </div>
                 </div>
                 <p className="m-0 text-xs text-teal-800 font-semibold">
                   {registroEditando ? 'Los cambios se guardarán únicamente en este registro. Puede añadir o quitar sus adjuntos desde la carpeta.' : registroPendienteId ? 'El registro ya se creó. Termine de subir los adjuntos pendientes con el botón de abajo.' : 'Cada guardado crea un registro nuevo para este paciente y conserva los anteriores.'}
@@ -835,22 +823,40 @@ function EnfermeriaContent() {
                 </button>
                 {mostrarOpcionales && (
                   <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 animate-fadeIn text-xs">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                      {DATOS_OPCIONALES_ORDENADOS.map(({ campo, etiqueta, ejemplo }) => (
-                        <label key={campo} className="block min-w-0">
-                          <span className="block text-[10px] font-bold text-slate-700 mb-1">{etiqueta}</span>
-                          <input
-                            type={campo === 'hb' || campo === 'frecuencia_respiratoria' ? 'number' : 'text'}
-                            step={campo === 'hb' ? '0.1' : undefined}
-                            min={campo === 'frecuencia_respiratoria' ? '1' : undefined}
-                            name={campo}
-                            value={form[campo]}
-                            onChange={handleChange}
-                            placeholder={ejemplo}
-                            className="w-full p-2 rounded-lg border border-slate-300 bg-white font-bold text-xs"
-                          />
-                        </label>
-                      ))}
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-2">
+                      <div className="flex flex-col gap-2">
+                        {DATOS_OPCIONALES_PRIMERA_COLUMNA.map(({ campo, etiqueta, ejemplo }) => (
+                          <label key={campo} className="block min-w-0">
+                            <span className="block text-[10px] font-bold text-slate-700 mb-1">{etiqueta}</span>
+                            <input
+                              type="text"
+                              inputMode={campo === 'imc' ? 'decimal' : undefined}
+                              name={campo}
+                              value={form[campo]}
+                              onChange={handleChange}
+                              placeholder={ejemplo}
+                              className="w-full p-2 rounded-lg border border-slate-300 bg-white font-bold text-xs"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 lg:col-span-3">
+                        {DATOS_OPCIONALES_ORDENADOS.map(({ campo, etiqueta, ejemplo }) => (
+                          <label key={campo} className="block min-w-0">
+                            <span className="block text-[10px] font-bold text-slate-700 mb-1">{etiqueta}</span>
+                            <input
+                              type={campo === 'hb' || campo === 'frecuencia_respiratoria' ? 'number' : 'text'}
+                              step={campo === 'hb' ? '0.1' : undefined}
+                              min={campo === 'frecuencia_respiratoria' ? '1' : undefined}
+                              name={campo}
+                              value={form[campo]}
+                              onChange={handleChange}
+                              placeholder={ejemplo}
+                              className="w-full p-2 rounded-lg border border-slate-300 bg-white font-bold text-xs"
+                            />
+                          </label>
+                        ))}
+                      </div>
                     </div>
                     <label className="block mt-3">
                       <span className="block text-[10px] font-bold text-slate-700 mb-1">Antecedentes médicos</span>
