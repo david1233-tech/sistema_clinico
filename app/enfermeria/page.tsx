@@ -93,11 +93,11 @@ const DATOS_OPCIONALES_COMPOSICION = [
     { campo: 'proteina', etiqueta: 'Proteína', ejemplo: 'Ej: 18%' },
     { campo: 'grado_obesidad_porcentaje', etiqueta: 'Grado de Obesidad%', ejemplo: 'Ej: +12%' },
     { campo: 'edad_metabolica', etiqueta: 'Edad Metabólica', ejemplo: 'Ej: 32 años' },
-    { campo: 'hb', etiqueta: 'HB', ejemplo: 'Ej: 13.5' },
   ],
 ] as const;
 
 const DATOS_OPCIONALES_LABORATORIO = [
+  { campo: 'hb', etiqueta: 'HB', ejemplo: 'Ej: 13.5' },
   { campo: 'globulos_rojos', etiqueta: 'G. Rojos', ejemplo: 'Ej: 4.5 mill' },
   { campo: 'globulos_blancos', etiqueta: 'G. Blancos', ejemplo: 'Ej: 7500' },
   { campo: 'hb_glicosilada', etiqueta: 'HB. Glicosilada', ejemplo: 'Ej: 5.4%' },
@@ -838,9 +838,8 @@ function EnfermeriaContent() {
                               <label key={campo} className="block min-w-0">
                                 <span className="block text-[10px] font-bold text-slate-700 mb-1">{etiqueta}</span>
                                 <input
-                                  type={campo === 'hb' ? 'number' : 'text'}
+                                  type="text"
                                   inputMode={campo === 'imc' ? 'decimal' : undefined}
-                                  step={campo === 'hb' ? '0.1' : undefined}
                                   name={campo}
                                   value={form[campo]}
                                   onChange={handleChange}
@@ -861,7 +860,8 @@ function EnfermeriaContent() {
                             <label key={campo} className="block min-w-0">
                               <span className="block text-[10px] font-bold text-slate-700 mb-1">{etiqueta}</span>
                               <input
-                                type="text"
+                                type={campo === 'hb' ? 'number' : 'text'}
+                                step={campo === 'hb' ? '0.1' : undefined}
                                 name={campo}
                                 value={form[campo]}
                                 onChange={handleChange}
