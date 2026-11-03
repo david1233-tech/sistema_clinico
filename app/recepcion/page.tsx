@@ -5,6 +5,23 @@ import Sidebar from '@/components/Sidebar';
 import NuevoPacienteModal from '@/components/NuevoPacienteModal';
 import BotonSeleccionarPaciente from '@/components/BotonSeleccionarPaciente';
 
+type EdicionPaciente = {
+  dni: string;
+  nombre: string;
+  telefono: string;
+  edad: string;
+  genero: string;
+  direccion: string;
+};
+
+type PacienteRecepcion = Partial<EdicionPaciente> & {
+  id?: string | number;
+  dni: string;
+  nombre: string;
+  dni_paciente?: string;
+  nombre_paciente?: string;
+};
+
 function RecepcionPageContent() {
   const searchParams = useSearchParams();
   const dniParam = searchParams.get('dni');
@@ -13,8 +30,12 @@ function RecepcionPageContent() {
   const [triajes, setTriajes] = useState<any[]>([]);
   const [consultas, setConsultas] = useState<any[]>([]);
   const [tratamientos, setTratamientos] = useState<any[]>([]);
-  const [ultimosPacientes, setUltimosPacientes] = useState<any[]>([]);
+  const [pacientesRegistrados, setPacientesRegistrados] = useState<PacienteRecepcion[]>([]);
+  const [filtroPacientes, setFiltroPacientes] = useState('');
   const [loading, setLoading] = useState<boolean>(true);
+  const [edicionPaciente, setEdicionPaciente] = useState<EdicionPaciente | null>(null);
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+  const [errorEdicion, setErrorEdicion] = useState('');
   
   // Estados para modales y navegación por pestañas en la tarjeta del paciente
   const [mostrarModalReceta, setMostrarModalReceta] = useState<boolean>(false);
@@ -43,7 +64,11 @@ function RecepcionPageContent() {
         return;
       }
 
-      setUltimosPacientes(dataTodos.slice(0, 15));
+      setPacientesRegistrados([...dataTodos].sort((a, b) =>
+        String(a.nombre || a.nombre_paciente || '').localeCompare(
+          String(b.nombre || b.nombre_paciente || ''), 'es-PE', { sensitivity: 'base' }
+        )
+      ));
 
       if (dniBuscado !== '') {
         const encontrado = dataTodos.find(
@@ -109,8 +134,8 @@ function RecepcionPageContent() {
         return;
       }
 
-      setUltimosPacientes(prev => 
-        prev.filter((p: any) => String(p.id || p.dni || p.dni_paciente) !== String(identifier))
+      setPacientesRegistrados(prev => 
+        prev.filter((p) => String(p.id || p.dni || p.dni_paciente) !== String(identifier))
       );
 
       if (paciente && String(paciente.dni || paciente.dni_paciente) === String(identifier)) {
@@ -118,6 +143,44 @@ function RecepcionPageContent() {
       }
 
       fetchDatosRecepcion();
+    }
+  };
+
+  const iniciarEdicionPaciente = (registro: PacienteRecepcion) => {
+    setErrorEdicion('');
+    setEdicionPaciente({
+      dni: String(registro.dni || registro.dni_paciente || ''),
+      nombre: String(registro.nombre || registro.nombre_paciente || ''),
+      telefono: String(registro.telefono || ''),
+      edad: registro.edad === null || registro.edad === undefined ? '' : String(registro.edad),
+      genero: String(registro.genero || ''),
+      direccion: String(registro.direccion || ''),
+    });
+  };
+
+  const actualizarEdicionPaciente = (campo: keyof EdicionPaciente, valor: string) => {
+    setEdicionPaciente(prev => prev ? { ...prev, [campo]: valor } : null);
+  };
+
+  const guardarEdicionPaciente = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!edicionPaciente) return;
+    setGuardandoEdicion(true);
+    setErrorEdicion('');
+    try {
+      const res = await fetch('/api/pacientes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(edicionPaciente),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo actualizar el paciente');
+      setEdicionPaciente(null);
+      await fetchDatosRecepcion();
+    } catch (error) {
+      setErrorEdicion(error instanceof Error ? error.message : 'No se pudo actualizar el paciente');
+    } finally {
+      setGuardandoEdicion(false);
     }
   };
 
@@ -148,6 +211,12 @@ function RecepcionPageContent() {
       window.print();
     }, 150);
   };
+
+  const filtroNormalizado = filtroPacientes.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const pacientesVisibles = pacientesRegistrados.filter((p) =>
+    String(p.nombre || p.nombre_paciente || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(filtroNormalizado) ||
+    String(p.dni || p.dni_paciente || '').includes(filtroNormalizado)
+  );
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -213,7 +282,7 @@ function RecepcionPageContent() {
           <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-end">
             <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 text-xs">
               <span className="text-slate-500 font-semibold">Registros Activos:</span>
-              <strong className="text-teal-600 font-extrabold">{ultimosPacientes.length} Pacientes</strong>
+              <strong className="text-teal-600 font-extrabold">{pacientesRegistrados.length} Pacientes</strong>
             </div>
             <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
               <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
@@ -305,6 +374,13 @@ function RecepcionPageContent() {
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <button
+                    type="button"
+                    onClick={() => iniciarEdicionPaciente(paciente)}
+                    className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl font-extrabold text-xs cursor-pointer"
+                  >
+                    ✏️ Editar paciente
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleImprimirRecetaIndividual(consultas.length > 0 ? consultas[0] : null)}
@@ -515,17 +591,31 @@ function RecepcionPageContent() {
           {/* TABLA PADRÓN ACTIVO */}
           {!dniBuscado && (
             <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-7 shadow-sm">
-              <div className="mb-5">
+              <div className="mb-5 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+                <div>
                 <div className="text-[11px] font-extrabold text-teal-600 uppercase tracking-wider">
                   Padrón Activo
                 </div>
                 <h3 className="m-0 text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
-                  Pacientes Registrados Recientemente
+                  Todos los pacientes registrados ({pacientesRegistrados.length}) · A-Z
                 </h3>
+                </div>
+                <input
+                  type="search"
+                  value={filtroPacientes}
+                  onChange={(e) => setFiltroPacientes(e.target.value)}
+                  placeholder="Buscar por nombre o DNI"
+                  aria-label="Buscar pacientes por nombre o DNI"
+                  className="w-full sm:w-72 px-3 py-2.5 rounded-xl border border-slate-300 bg-white text-sm text-slate-900 outline-none focus:border-teal-600"
+                />
               </div>
-              {ultimosPacientes.length === 0 ? (
+              {pacientesRegistrados.length === 0 ? (
                 <div className="text-center py-12 text-slate-400 text-xs sm:text-sm">
                   No existen pacientes registrados actualmente en el sistema.
+                </div>
+              ) : pacientesVisibles.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-xs sm:text-sm">
+                  No hay pacientes que coincidan con la búsqueda.
                 </div>
               ) : (
                 <div className="overflow-x-auto w-full">
@@ -540,7 +630,7 @@ function RecepcionPageContent() {
                       </tr>
                     </thead>
                     <tbody>
-                      {ultimosPacientes.map((p: any) => (
+                      {pacientesVisibles.map((p) => (
                         <tr key={p.id || p.dni || p.dni_paciente} className="bg-white border border-slate-200 shadow-sm hover:bg-slate-50 transition-all">
                           <td className="px-4 py-3 font-bold text-slate-900 rounded-l-xl border-l-4 border-teal-600 border-t border-b border-slate-200">
                             <div className="flex items-center gap-3">
@@ -566,7 +656,14 @@ function RecepcionPageContent() {
                           </td>
                           <td className="px-4 py-3 text-right rounded-r-xl border-r border-t border-b border-slate-200">
                             <div className="flex items-center justify-end gap-2">
-                              <BotonSeleccionarPaciente dni={p.dni || p.dni_paciente} nombre={p.nombre} />
+                              <BotonSeleccionarPaciente dni={p.dni} nombre={p.nombre} />
+                              <button
+                                type="button"
+                                onClick={() => iniciarEdicionPaciente(p)}
+                                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl font-extrabold text-xs cursor-pointer"
+                              >
+                                ✏️ Editar
+                              </button>
                               <a
                                 href={`/recepcion?dni=${p.dni || p.dni_paciente}`}
                                 className="px-3 py-2 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-xl font-extrabold text-xs no-underline transition-all inline-flex items-center gap-1"
@@ -595,6 +692,52 @@ function RecepcionPageContent() {
 
         </main>
       </div>
+
+      {edicionPaciente && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 no-print" role="dialog" aria-modal="true" aria-label="Editar paciente">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 sm:p-7">
+            <div className="flex items-center justify-between gap-3 mb-5">
+              <h2 className="m-0 text-lg font-extrabold text-slate-900">Editar paciente</h2>
+              <button type="button" onClick={() => setEdicionPaciente(null)} disabled={guardandoEdicion} aria-label="Cerrar edición" className="text-slate-500 hover:text-slate-900 text-xl cursor-pointer">✕</button>
+            </div>
+            <form onSubmit={guardarEdicionPaciente} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="block text-xs font-bold text-slate-700">
+                DNI
+                <input value={edicionPaciente.dni} readOnly className="mt-1 w-full p-2.5 rounded-xl border border-slate-300 bg-slate-100 text-slate-700" />
+              </label>
+              <label className="block text-xs font-bold text-slate-700">
+                Edad
+                <input type="number" min="0" max="130" value={edicionPaciente.edad} onChange={(e) => actualizarEdicionPaciente('edad', e.target.value)} className="mt-1 w-full p-2.5 rounded-xl border border-slate-300 text-slate-900" />
+              </label>
+              <label className="block text-xs font-bold text-slate-700 sm:col-span-2">
+                Nombre completo *
+                <input required maxLength={200} value={edicionPaciente.nombre} onChange={(e) => actualizarEdicionPaciente('nombre', e.target.value)} className="mt-1 w-full p-2.5 rounded-xl border border-slate-300 text-slate-900" />
+              </label>
+              <label className="block text-xs font-bold text-slate-700">
+                Teléfono
+                <input maxLength={30} value={edicionPaciente.telefono} onChange={(e) => actualizarEdicionPaciente('telefono', e.target.value)} className="mt-1 w-full p-2.5 rounded-xl border border-slate-300 text-slate-900" />
+              </label>
+              <label className="block text-xs font-bold text-slate-700">
+                Género
+                <select value={edicionPaciente.genero} onChange={(e) => actualizarEdicionPaciente('genero', e.target.value)} className="mt-1 w-full p-2.5 rounded-xl border border-slate-300 bg-white text-slate-900">
+                  <option value="">Seleccionar</option>
+                  <option value="Femenino">Femenino</option>
+                  <option value="Masculino">Masculino</option>
+                </select>
+              </label>
+              <label className="block text-xs font-bold text-slate-700 sm:col-span-2">
+                Dirección
+                <input maxLength={255} value={edicionPaciente.direccion} onChange={(e) => actualizarEdicionPaciente('direccion', e.target.value)} className="mt-1 w-full p-2.5 rounded-xl border border-slate-300 text-slate-900" />
+              </label>
+              {errorEdicion && <p role="alert" className="m-0 text-sm text-rose-700 sm:col-span-2">{errorEdicion}</p>}
+              <div className="flex justify-end gap-2 sm:col-span-2">
+                <button type="button" onClick={() => setEdicionPaciente(null)} disabled={guardandoEdicion} className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold cursor-pointer">Cancelar</button>
+                <button type="submit" disabled={guardandoEdicion} className="px-4 py-2.5 rounded-xl bg-teal-700 text-white font-bold cursor-pointer disabled:opacity-50">{guardandoEdicion ? 'Guardando...' : 'Guardar cambios'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* MODAL PARA VER IMAGEN EN PANTALLA COMPLETA */}
       {mostrarModalImagen && consultas.length > 0 && consultas[0].imagen_url && (
@@ -746,4 +889,3 @@ export default function RecepcionPage() {
     </Suspense>
   );
 }
-
