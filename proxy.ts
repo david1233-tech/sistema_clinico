@@ -11,7 +11,7 @@ export function proxy(request: NextRequest) {
   }
   if (!allows(session.role, pathname, request.method)) {
     if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'No tiene permiso para esta operación.' }, { status: 403 });
-    return NextResponse.redirect(new URL(session.role === 'doctora' ? '/dashboard' : session.role === 'enfermera' ? '/enfermeria' : '/agenda', request.url));
+    return NextResponse.redirect(new URL(session.role === 'doctora' ? '/dashboard' : session.role === 'enfermera' ? '/enfermeria' : session.role === 'operador' ? '/recepcion' : '/agenda', request.url));
   }
   return NextResponse.next();
 }
@@ -24,4 +24,3 @@ export const config = {
     '/medico/:path*', '/hospitalizacion/:path*',
   ],
 };
-
