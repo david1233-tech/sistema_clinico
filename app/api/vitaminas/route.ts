@@ -43,10 +43,15 @@ function asegurarTablaRecetas() {
         await pgPool.query('ALTER TABLE recetas ADD COLUMN IF NOT EXISTS "vitaminaNombre" VARCHAR(200)');
         nombreVitamina = 'vitaminaNombre';
       }
-      const nombreFecha = ['fechaAplicacion', 'fechaaplicacion', 'fecha_aplicacion'].find(nombre => nombres.has(nombre));
+      let nombreFecha = ['fechaAplicacion', 'fechaaplicacion', 'fecha_aplicacion'].find(nombre => nombres.has(nombre));
+      if (!nombreFecha) {
+        await pgPool.query('ALTER TABLE recetas ADD COLUMN IF NOT EXISTS "fechaAplicacion" TIMESTAMPTZ');
+        await pgPool.query('ALTER TABLE recetas ALTER COLUMN "fechaAplicacion" SET DEFAULT NOW()');
+        nombreFecha = 'fechaAplicacion';
+      }
       return {
         vitamina: citarColumna(nombreVitamina),
-        fecha: nombreFecha ? citarColumna(nombreFecha) : 'NULL'
+        fecha: citarColumna(nombreFecha)
       };
     })().catch(error => {
       tablaLista = undefined;
@@ -89,7 +94,10 @@ export async function POST(request: Request) {
       `INSERT INTO recetas (dni_paciente, nombre_paciente, ${columnas.vitamina}, dosis, via, observaciones) VALUES (?, ?, ?, ?, ?, ?)`,
       [dni, nombre, vitamina, dosis, String(body.via ?? '').trim(), String(body.observaciones ?? '').trim()]
     );
-    return NextResponse.json({ success: true, id: result.insertId }, { status: 201 });
+    const [guardado] = await pool.query<RowDataPacket[]>(
+      `SELECT ${columnas.fecha} AS "fechaAplicacion" FROM recetas WHERE id = ?`, [result.insertId]
+    );
+    return NextResponse.json({ success: true, id: result.insertId, fechaAplicacion: guardado[0]?.fechaAplicacion }, { status: 201 });
   } catch (error) {
     console.error('Error al guardar vitamina:', error);
     const codigo = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
@@ -98,6 +106,54 @@ export async function POST(request: Request) {
     return NextResponse.json({
       error: codigo ? `No se pudo guardar el tratamiento. Código: ${codigo}` : 'No se pudo guardar el tratamiento.'
     }, { status: 503 });
+  }
+}
+
+export async function PUT(request: Request) {
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 });
+  }
+  const id = Number(body.id);
+  const dni = String(body.dni_paciente ?? '').trim();
+  const vitamina = String(body.vitaminaNombre ?? '').trim();
+  const dosis = String(body.dosis ?? '').trim();
+  if (!Number.isSafeInteger(id) || id <= 0 || !/^\d{8}$/.test(dni) || !vitamina || !dosis) {
+    return NextResponse.json({ error: 'Complete el paciente, la vitamina o suero y la dosis.' }, { status: 400 });
+  }
+  try {
+    const columnas = await asegurarTablaRecetas();
+    const [result] = await pool.execute<ResultSetHeader>(
+      `UPDATE recetas SET ${columnas.vitamina} = ?, dosis = ?, via = ?, observaciones = ? WHERE id = ? AND dni_paciente = ?`,
+      [vitamina, dosis, String(body.via ?? '').trim(), String(body.observaciones ?? '').trim(), id, dni]
+    );
+    if (!result.affectedRows) return NextResponse.json({ error: 'Tratamiento no encontrado.' }, { status: 404 });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error al editar vitamina:', error);
+    return NextResponse.json({ error: 'No se pudo actualizar el tratamiento.' }, { status: 503 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const id = Number(searchParams.get('id'));
+  const dni = searchParams.get('dni')?.trim() || '';
+  if (!Number.isSafeInteger(id) || id <= 0 || !/^\d{8}$/.test(dni)) {
+    return NextResponse.json({ error: 'Tratamiento o paciente inválido.' }, { status: 400 });
+  }
+  try {
+    await asegurarTablaRecetas();
+    const [result] = await pool.execute<ResultSetHeader>(
+      'DELETE FROM recetas WHERE id = ? AND dni_paciente = ?', [id, dni]
+    );
+    if (!result.affectedRows) return NextResponse.json({ error: 'Tratamiento no encontrado.' }, { status: 404 });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error al eliminar vitamina:', error);
+    return NextResponse.json({ error: 'No se pudo eliminar el tratamiento.' }, { status: 503 });
   }
 }
 
