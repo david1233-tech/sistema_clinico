@@ -22,16 +22,24 @@ type PacienteRecepcion = Partial<EdicionPaciente> & {
   nombre_paciente?: string;
 };
 
+const normalizarBusqueda = (texto: string) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+const primerApellido = (nombre: string) => {
+  const partes = nombre.trim().split(/\s+/).filter(Boolean);
+  return partes.length >= 3 ? partes[partes.length - 2] : partes[partes.length - 1] || '';
+};
+
 function RecepcionPageContent() {
   const searchParams = useSearchParams();
   const dniParam = searchParams.get('dni');
-  const dniBuscado = dniParam ? dniParam.replace(/\D/g, '').trim() : '';
+  const busquedaParam = searchParams.get('buscar')?.trim() || '';
+  const dniBuscado = dniParam ? dniParam.replace(/\D/g, '').trim() : /^\d{8}$/.test(busquedaParam) ? busquedaParam : '';
   const [paciente, setPaciente] = useState<any>(null);
   const [triajes, setTriajes] = useState<any[]>([]);
   const [consultas, setConsultas] = useState<any[]>([]);
   const [tratamientos, setTratamientos] = useState<any[]>([]);
   const [pacientesRegistrados, setPacientesRegistrados] = useState<PacienteRecepcion[]>([]);
-  const [filtroPacientes, setFiltroPacientes] = useState('');
+  const [filtroPacientes, setFiltroPacientes] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [edicionPaciente, setEdicionPaciente] = useState<EdicionPaciente | null>(null);
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
@@ -64,11 +72,12 @@ function RecepcionPageContent() {
         return;
       }
 
-      setPacientesRegistrados([...dataTodos].sort((a, b) =>
-        String(a.nombre || a.nombre_paciente || '').localeCompare(
-          String(b.nombre || b.nombre_paciente || ''), 'es-PE', { sensitivity: 'base' }
-        )
-      ));
+      setPacientesRegistrados([...dataTodos].sort((a, b) => {
+        const nombreA = String(a.nombre || a.nombre_paciente || '');
+        const nombreB = String(b.nombre || b.nombre_paciente || '');
+        return primerApellido(nombreA).localeCompare(primerApellido(nombreB), 'es-PE', { sensitivity: 'base' }) ||
+          nombreA.localeCompare(nombreB, 'es-PE', { sensitivity: 'base' });
+      }));
 
       if (dniBuscado !== '') {
         const encontrado = dataTodos.find(
@@ -212,11 +221,15 @@ function RecepcionPageContent() {
     }, 150);
   };
 
-  const filtroNormalizado = filtroPacientes.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  const pacientesVisibles = pacientesRegistrados.filter((p) =>
-    String(p.nombre || p.nombre_paciente || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(filtroNormalizado) ||
-    String(p.dni || p.dni_paciente || '').includes(filtroNormalizado)
-  );
+  const filtroNormalizado = normalizarBusqueda((filtroPacientes ?? busquedaParam).trim());
+  const pacientesVisibles = pacientesRegistrados.filter((p) => {
+    const nombre = String(p.nombre || p.nombre_paciente || '');
+    if (/^[a-z]$/.test(filtroNormalizado)) {
+      return normalizarBusqueda(primerApellido(nombre)).startsWith(filtroNormalizado);
+    }
+    return normalizarBusqueda(nombre).includes(filtroNormalizado) ||
+      String(p.dni || p.dni_paciente || '').includes(filtroNormalizado);
+  });
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -301,21 +314,21 @@ function RecepcionPageContent() {
                 ⚡ Buscador de Expedientes
               </div>
               <h2 className="m-0 text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
-                Consultar Paciente por DNI
+                Buscar pacientes por apellido o DNI
               </h2>
               <p className="m-0 text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
-                Ingrese el DNI para ubicar al paciente, ver su estado actual y consultar su expediente completo.
+                Escriba la primera letra del apellido para ver pacientes en orden alfabético, o ingrese el DNI para abrir su expediente.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-              <form method="GET" className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center w-full sm:w-auto">
+              <form method="GET" action="/recepcion" onSubmit={() => setFiltroPacientes(null)} className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center w-full sm:w-auto">
                 <div className="relative w-full sm:w-64">
                   <input
                     type="text"
-                    name="dni"
-                    maxLength={8}
-                    defaultValue={dniBuscado}
-                    placeholder="Ingrese DNI (8 dígitos)..."
+                    name="buscar"
+                    key={busquedaParam || dniBuscado}
+                    defaultValue={busquedaParam || dniBuscado}
+                    placeholder="Inicial del apellido o DNI..."
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm outline-none bg-white font-semibold text-slate-900 shadow-sm"
                     required
                   />
@@ -330,9 +343,10 @@ function RecepcionPageContent() {
                 >
                   Buscar
                 </button>
-                {dniBuscado && (
+                {(dniBuscado || busquedaParam) && (
                   <a
                     href="/recepcion"
+                    onClick={() => setFiltroPacientes(null)}
                     className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-center font-bold text-xs border border-slate-300 no-underline"
                   >
                     ✕ Limpiar
@@ -597,15 +611,15 @@ function RecepcionPageContent() {
                   Padrón Activo
                 </div>
                 <h3 className="m-0 text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
-                  Todos los pacientes registrados ({pacientesRegistrados.length}) · A-Z
+                  Todos los pacientes registrados ({pacientesRegistrados.length}) · por apellido A-Z
                 </h3>
                 </div>
                 <input
                   type="search"
-                  value={filtroPacientes}
+                  value={filtroPacientes ?? busquedaParam}
                   onChange={(e) => setFiltroPacientes(e.target.value)}
-                  placeholder="Buscar por nombre o DNI"
-                  aria-label="Buscar pacientes por nombre o DNI"
+                  placeholder="Inicial del apellido, nombre o DNI"
+                  aria-label="Buscar pacientes por inicial del apellido, nombre o DNI"
                   className="w-full sm:w-72 px-3 py-2.5 rounded-xl border border-slate-300 bg-white text-sm text-slate-900 outline-none focus:border-teal-600"
                 />
               </div>
