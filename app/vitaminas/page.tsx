@@ -136,6 +136,19 @@ Zing`.split('\n')));
 
 const normalizarBusqueda = (valor: string) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
+function actualizarResumenPaciente(paciente: Paciente, tratamientos: Tratamiento[]) {
+  const ultimo = tratamientos.find(t => t.dni_paciente === paciente.dni_paciente);
+  return {
+    ...paciente,
+    aplicaVitamina: Boolean(ultimo?.activo),
+    vitaminaNombre: ultimo?.vitaminaNombre || '',
+    dosis: ultimo?.dosis || '',
+    via: ultimo?.via || '',
+    observaciones: ultimo?.observaciones || '',
+    fechaAplicacion: ultimo?.fechaAplicacion || ''
+  };
+}
+
 function VitaminasPageContent() {
   const searchParams = useSearchParams();
   const dniParam = searchParams.get('dni');
@@ -147,6 +160,7 @@ function VitaminasPageContent() {
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
+  const [registroEditando, setRegistroEditando] = useState<Tratamiento | null>(null);
   
   const [formVitamina, setFormVitamina] = useState({
     vitaminaNombre: '',
@@ -160,7 +174,7 @@ function VitaminasPageContent() {
   }, []);
 
   useEffect(() => {
-    if (pacientes.length === 0) return;
+    if (pacientes.length === 0 || pacienteSeleccionado) return;
     let dniTarget = dniParam;
     if (!dniTarget) {
       const guardado = localStorage.getItem('paciente_activo_vital_salud');
@@ -175,18 +189,8 @@ function VitaminasPageContent() {
         }
       }
     }
-    if (dniTarget && dniTarget !== pacienteSeleccionado?.dni_paciente) {
-      const encontrado = pacientes.find(p => p.dni_paciente === dniTarget);
-      if (encontrado) {
-        setPacienteSeleccionado(encontrado);
-        return;
-      }
-    }
-    
-    if (!pacienteSeleccionado && pacientes.length > 0) {
-      setPacienteSeleccionado(pacientes[0]);
-    }
-  }, [dniParam, pacientes]);
+    setPacienteSeleccionado(pacientes.find(p => p.dni_paciente === dniTarget) || pacientes[0]);
+  }, [dniParam, pacientes, pacienteSeleccionado]);
 
   const fetchPacientesTodos = async () => {
     try {
@@ -261,7 +265,9 @@ function VitaminasPageContent() {
   };
 
   const handleSeleccionarPaciente = (p: Paciente) => {
+    if (saving) return;
     setPacienteSeleccionado(p);
+    setRegistroEditando(null);
     setFormVitamina({ vitaminaNombre: '', dosis: '', via: '', observaciones: '' });
     setBusquedaVitamina('');
     setMostrarCatalogo(false);
@@ -302,50 +308,89 @@ function VitaminasPageContent() {
     setMostrarCatalogo(false);
   };
 
+  const handleEditarTratamiento = (tratamiento: Tratamiento) => {
+    if (saving) return;
+    setRegistroEditando(tratamiento);
+    setFormVitamina({
+      vitaminaNombre: tratamiento.vitaminaNombre,
+      dosis: tratamiento.dosis || '',
+      via: tratamiento.via || '',
+      observaciones: tratamiento.observaciones || ''
+    });
+    setBusquedaVitamina('');
+    setMostrarCatalogo(false);
+    document.getElementById('formulario-vitamina')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleCancelarEdicion = () => {
+    setRegistroEditando(null);
+    handleLimpiarFormulario();
+  };
+
   const handleGuardarVitamina = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pacienteSeleccionado) return;
     try {
       setSaving(true);
-      const fechaActual = new Date().toISOString();
-      
-      const pacienteActualizado: Paciente = {
-        ...pacienteSeleccionado,
-        aplicaVitamina: true,
-        ...formVitamina,
-        fechaAplicacion: fechaActual
-      };
-
       const response = await fetch('/api/vitaminas', {
-        method: 'POST',
+        method: registroEditando ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pacienteActualizado)
+        body: JSON.stringify({
+          ...formVitamina,
+          dni_paciente: pacienteSeleccionado.dni_paciente,
+          nombre_paciente: pacienteSeleccionado.nombre_paciente,
+          ...(registroEditando ? { id: registroEditando.id } : {})
+        })
       });
       if (!response.ok) throw new Error((await response.json()).error || 'No se pudo guardar el tratamiento');
-      const guardado: { id: number } = await response.json();
-      setTratamientos(prev => [{
-        id: guardado.id,
-        dni_paciente: pacienteSeleccionado.dni_paciente,
+      const guardado: { id?: number; fechaAplicacion?: string } = await response.json();
+      const datos = {
         vitaminaNombre: formVitamina.vitaminaNombre.trim(),
         dosis: formVitamina.dosis.trim(),
         via: formVitamina.via.trim(),
-        observaciones: formVitamina.observaciones.trim(),
-        fechaAplicacion: fechaActual,
-        activo: true
-      }, ...prev]);
-
-      setPacientes(prev =>
-        prev.map(p => (p.id === pacienteSeleccionado.id ? pacienteActualizado : p))
-      );
-      setPacienteSeleccionado(pacienteActualizado);
-      
-      // Limpiamos los campos del formulario tras guardar con éxito
+        observaciones: formVitamina.observaciones.trim()
+      };
+      let listaActualizada: Tratamiento[];
+      if (registroEditando) {
+        listaActualizada = tratamientos.map(t => t.id === registroEditando.id ? { ...t, ...datos } : t);
+      } else {
+        if (!guardado.id) throw new Error('El tratamiento se guardó, pero no se recibió su identificador. Recargue la página antes de volver a intentar.');
+        listaActualizada = [{
+          id: guardado.id,
+          dni_paciente: pacienteSeleccionado.dni_paciente,
+          ...datos,
+          fechaAplicacion: guardado.fechaAplicacion || new Date().toISOString(),
+          activo: true
+        }, ...tratamientos];
+      }
+      setTratamientos(listaActualizada);
+      setPacientes(prev => prev.map(p => p.dni_paciente === pacienteSeleccionado.dni_paciente ? actualizarResumenPaciente(p, listaActualizada) : p));
+      setPacienteSeleccionado(prev => prev?.dni_paciente === pacienteSeleccionado.dni_paciente ? actualizarResumenPaciente(prev, listaActualizada) : prev);
+      setRegistroEditando(null);
       handleLimpiarFormulario();
-
-      alert(`✅ Tratamiento guardado con éxito para ${pacienteSeleccionado.nombre_paciente || pacienteSeleccionado.dni_paciente}`);
+      alert(registroEditando ? '✅ Tratamiento actualizado.' : `✅ Tratamiento guardado para ${pacienteSeleccionado.nombre_paciente || pacienteSeleccionado.dni_paciente}`);
     } catch (err) {
       console.error('Error guardando vitamina:', err);
       alert(err instanceof Error ? err.message : 'No se pudo guardar el tratamiento');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEliminarTratamiento = async (tratamiento: Tratamiento) => {
+    if (saving || !pacienteSeleccionado) return;
+    if (!confirm(`¿Eliminar el registro de ${tratamiento.vitaminaNombre}? Esta acción no se puede deshacer.`)) return;
+    try {
+      setSaving(true);
+      const response = await fetch(`/api/vitaminas?id=${tratamiento.id}&dni=${encodeURIComponent(pacienteSeleccionado.dni_paciente)}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error((await response.json()).error || 'No se pudo eliminar el tratamiento');
+      const listaActualizada = tratamientos.filter(t => t.id !== tratamiento.id);
+      setTratamientos(listaActualizada);
+      setPacientes(prev => prev.map(p => p.dni_paciente === pacienteSeleccionado.dni_paciente ? actualizarResumenPaciente(p, listaActualizada) : p));
+      setPacienteSeleccionado(prev => prev?.dni_paciente === pacienteSeleccionado.dni_paciente ? actualizarResumenPaciente(prev, listaActualizada) : prev);
+      if (registroEditando?.id === tratamiento.id) handleCancelarEdicion();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo eliminar el tratamiento');
     } finally {
       setSaving(false);
     }
@@ -372,6 +417,7 @@ function VitaminasPageContent() {
         );
         setTratamientos(prev => prev.map(t => t.dni_paciente === pacienteSinVitamina.dni_paciente ? { ...t, activo: false } : t));
         setPacienteSeleccionado(pacienteSinVitamina);
+        setRegistroEditando(null);
         setFormVitamina({ vitaminaNombre: '', dosis: '', via: '', observaciones: '' });
       } catch (err) {
         console.error('Error desmarcando vitamina:', err);
@@ -569,12 +615,12 @@ function VitaminasPageContent() {
                     </div>
                   </div>
 
-                  <form onSubmit={handleGuardarVitamina} className="bg-white rounded-2xl border border-slate-200 p-5 md:p-6 shadow-sm flex flex-col gap-4">
+                  <form id="formulario-vitamina" onSubmit={handleGuardarVitamina} className="bg-white rounded-2xl border border-slate-200 p-5 md:p-6 shadow-sm flex flex-col gap-4 scroll-mt-24">
                     <div className="bg-gradient-to-br from-teal-600 to-teal-800 p-4 rounded-xl text-white flex items-center gap-3">
                       <span className="text-2xl">🧪</span>
                       <div>
-                        <h3 className="m-0 text-sm md:text-base font-extrabold text-white">Especificación de Vitaminas e Inyectables</h3>
-                        <p className="m-0 text-xs text-teal-100">Rellene manualmente los datos de la dosis aplicada al paciente</p>
+                        <h3 className="m-0 text-sm md:text-base font-extrabold text-white">{registroEditando ? 'Editar vitamina o suero guardado' : 'Especificación de Vitaminas e Inyectables'}</h3>
+                        <p className="m-0 text-xs text-teal-100">{registroEditando ? 'Los cambios se aplicarán solo a este registro.' : 'Rellene manualmente los datos de la dosis aplicada al paciente'}</p>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -670,16 +716,22 @@ function VitaminasPageContent() {
                       <button
                         type="button"
                         onClick={handleLimpiarFormulario}
+                        disabled={saving}
                         className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl font-extrabold text-xs md:text-sm cursor-pointer transition-all"
                       >
                         🧹 Limpiar Formulario
                       </button>
+                      {registroEditando && (
+                        <button type="button" onClick={handleCancelarEdicion} disabled={saving} className="px-4 py-3 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl font-extrabold text-xs md:text-sm cursor-pointer">
+                          Cancelar edición
+                        </button>
+                      )}
                       <button
                         type="submit"
                         disabled={saving}
                         className="w-full sm:w-auto px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white border-none rounded-xl font-extrabold text-xs md:text-sm cursor-pointer shadow-md transition-all flex items-center justify-center gap-2"
                       >
-                        <span>💉</span> {saving ? 'Guardando...' : 'Guardar y Confirmar Aplicación'}
+                        <span>💉</span> {saving ? 'Guardando...' : registroEditando ? 'Guardar cambios' : 'Guardar y Confirmar Aplicación'}
                       </button>
                     </div>
                   </form>
@@ -693,11 +745,15 @@ function VitaminasPageContent() {
                           <div key={t.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs md:text-sm break-words">
                             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                               <strong className="text-slate-900">{t.vitaminaNombre}</strong>
-                              <span className="text-slate-500 font-semibold">{t.fechaAplicacion ? new Date(t.fechaAplicacion).toLocaleString('es-PE') : 'Sin fecha'}</span>
+                              <span className="text-slate-500 font-semibold">Fecha y hora de aplicación: {t.fechaAplicacion ? new Date(t.fechaAplicacion).toLocaleString('es-PE') : 'Sin fecha'}</span>
                             </div>
                             <p className="m-0"><strong>Dosis / cantidad:</strong> {t.dosis || 'No registrada'}</p>
                             <p className="m-0 mt-1"><strong>Vía de administración:</strong> {t.via || 'No registrada'}</p>
                             <p className="m-0 mt-1 whitespace-pre-wrap"><strong>Observaciones:</strong> {t.observaciones || 'Sin observaciones'}</p>
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              <button type="button" onClick={() => handleEditarTratamiento(t)} disabled={saving} className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50">✏️ Editar</button>
+                              <button type="button" onClick={() => handleEliminarTratamiento(t)} disabled={saving} className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50">🗑️ Eliminar</button>
+                            </div>
                           </div>
                         ))}
                       </div>
