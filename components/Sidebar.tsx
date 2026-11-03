@@ -31,11 +31,11 @@ export default function Sidebar() {
   // Todos los ítems posibles
   const allMenuItems = [
     { name: 'Dashboard General', icon: '📊', path: '/dashboard', roles: ['doctora'] },
-    { name: 'Admisión y Pacientes', icon: '🚑', path: '/recepcion', roles: ['doctora', 'enfermera', 'recepcion'] },
-    { name: 'Triaje y Signos Vitales', icon: '🩺', path: '/enfermeria', roles: ['doctora', 'enfermera'] },
+    { name: 'Admisión y Pacientes', icon: '🚑', path: '/recepcion', roles: ['doctora', 'enfermera', 'recepcion', 'operador'] },
+    { name: 'Triaje y Signos Vitales', icon: '🩺', path: '/enfermeria', roles: ['doctora', 'enfermera', 'operador'] },
     { name: 'Consultorio Médico', icon: '👨‍⚕️', path: '/consultorio', roles: ['doctora'] },
-    { name: 'Agenda y Citas', icon: '📅', path: '/agenda', roles: ['doctora', 'recepcion'] },
-    { name: 'Vitaminas y Controles', icon: '💉', path: '/vitaminas', roles: ['doctora', 'enfermera'] },
+    { name: 'Agenda y Citas', icon: '📅', path: '/agenda', roles: ['doctora', 'recepcion', 'operador'] },
+    { name: 'Vitaminas y Controles', icon: '💉', path: '/vitaminas', roles: ['doctora', 'enfermera', 'operador'] },
     { name: 'Internados / Hospedaje', icon: '🏥', path: '/internados', roles: ['doctora', 'enfermera'] },
     { name: 'Caja y Reportes de Pagos', icon: '💰', path: '/caja', roles: ['doctora', 'recepcion'] },
   ];
@@ -147,4 +147,3 @@ export default function Sidebar() {
     </>
   );
 }
-
