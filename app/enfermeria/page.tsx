@@ -686,54 +686,54 @@ function EnfermeriaContent() {
                     })}
                   </select>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase">
-                      DNI PACIENTE * {buscandoDni && <span className="text-teal-600 font-bold">(buscando...)</span>}
-                    </label>
-                    <input
-                      type="text"
-                      name="dni_paciente"
-                      value={form.dni_paciente}
-                      onChange={handleChange}
-                      disabled={saving || Boolean(registroPendienteId)}
-                      placeholder="Ej: 71234567"
-                      className="w-full p-2.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs outline-none focus:border-teal-600 focus:bg-white"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase">
-                      NOMBRE PACIENTE *
-                    </label>
-                    <input
-                      type="text"
-                      name="nombre_paciente"
-                      value={form.nombre_paciente}
-                      onChange={handleChange}
-                      placeholder="Escribe el nombre..."
-                      className="w-full p-2.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs outline-none focus:border-teal-600 focus:bg-white"
-                      required
-                    />
-                  </div>
-                </div>
                 <div className="border-t border-slate-200 pt-3">
                   <span className="text-[11px] font-extrabold text-teal-800 uppercase block mb-2 tracking-wider">
                     DATOS PRINCIPALES (OBLIGATORIOS)
                   </span>
-                  <div className="grid grid-cols-3 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-2.5">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-700 mb-1">EDAD *</label>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">P/A (mmHg) *</label>
+                      <input type="text" name="presion_arterial" value={form.presion_arterial} onChange={handleChange} placeholder="120/80" className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600" required />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">PULSO *</label>
                       <input
                         type="number"
-                        name="edad"
-                        value={form.edad}
+                        name="pulso"
+                        value={form.pulso}
                         onChange={handleChange}
-                        placeholder="Ej: 30"
+                        placeholder="Ej: 72"
                         className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600"
                         required
                       />
                     </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">SO2 % *</label>
+                      <input
+                        type="number"
+                        name="so2"
+                        value={form.so2}
+                        onChange={handleChange}
+                        placeholder="Ej: 98"
+                        className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">T° (°C) *</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        name="temperatura"
+                        value={form.temperatura}
+                        onChange={handleChange}
+                        placeholder="Ej: 36.5"
+                        className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-2.5">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-700 mb-1">TALLA (cm) *</label>
                       <input
@@ -761,8 +761,6 @@ function EnfermeriaContent() {
                         required
                       />
                     </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2.5 mt-2.5">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-700 mb-1">IMC *</label>
                       <input
@@ -779,48 +777,49 @@ function EnfermeriaContent() {
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-700 mb-1">PULSO *</label>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">EDAD *</label>
                       <input
                         type="number"
-                        name="pulso"
-                        value={form.pulso}
+                        name="edad"
+                        value={form.edad}
                         onChange={handleChange}
-                        placeholder="Ej: 72"
-                        className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-700 mb-1">SO2 % *</label>
-                      <input
-                        type="number"
-                        name="so2"
-                        value={form.so2}
-                        onChange={handleChange}
-                        placeholder="Ej: 98"
+                        readOnly={Boolean(!registroEditando && pacientesRegistrados.find(p => String(p.dni || p.dni_paciente) === form.dni_paciente)?.edad)}
+                        placeholder="Ej: 30"
                         className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600"
                         required
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2.5 mt-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2.5">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-700 mb-1">T° (°C) *</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        name="temperatura"
-                        value={form.temperatura}
-                        onChange={handleChange}
-                        placeholder="Ej: 36.5"
-                        className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600"
-                        required
-                      />
-                    </div>
+                    <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase">
+                      DNI PACIENTE * {buscandoDni && <span className="text-teal-600 font-bold">(buscando...)</span>}
+                    </label>
+                    <input
+                      type="text"
+                      name="dni_paciente"
+                      value={form.dni_paciente}
+                      onChange={handleChange}
+                      disabled={saving || Boolean(registroPendienteId)}
+                      placeholder="Ej: 71234567"
+                      className="w-full p-2.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs outline-none focus:border-teal-600 focus:bg-white"
+                      required
+                    />
+                  </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-700 mb-1">P/A (mmHg) *</label>
-                      <input type="text" name="presion_arterial" value={form.presion_arterial} onChange={handleChange} placeholder="120/80" className="w-full p-2 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs outline-none focus:border-teal-600" required />
-                    </div>
+                    <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase">
+                      NOMBRE PACIENTE *
+                    </label>
+                    <input
+                      type="text"
+                      name="nombre_paciente"
+                      value={form.nombre_paciente}
+                      onChange={handleChange}
+                      placeholder="Escribe el nombre..."
+                      className="w-full p-2.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs outline-none focus:border-teal-600 focus:bg-white"
+                      required
+                    />
+                  </div>
                   </div>
                 </div>
                 <p className="m-0 text-xs text-teal-800 font-semibold">
@@ -1163,4 +1162,3 @@ export default function EnfermeriaPage() {
     </Suspense>
   );
 }
-
