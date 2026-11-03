@@ -83,21 +83,53 @@ export async function POST(request: Request) {
   }
   const dni = String(body.dni_paciente ?? '').trim();
   const nombre = String(body.nombre_paciente ?? '').trim();
-  const vitamina = String(body.vitaminaNombre ?? '').trim();
-  const dosis = String(body.dosis ?? '').trim();
-  if (!/^\d{8}$/.test(dni) || !nombre || !vitamina || !dosis) {
-    return NextResponse.json({ error: 'Complete el paciente, la vitamina o suero y la dosis.' }, { status: 400 });
+  const entradas = body.tratamientos === undefined ? [body] : body.tratamientos;
+  if (!/^\d{8}$/.test(dni) || !nombre || !Array.isArray(entradas) || entradas.length < 1 || entradas.length > 50) {
+    return NextResponse.json({ error: 'Indique un paciente y entre 1 y 50 vitaminas o sueros.' }, { status: 400 });
+  }
+  const aplicaciones = entradas.map(entrada => {
+    const item = entrada && typeof entrada === 'object' && !Array.isArray(entrada) ? entrada as Record<string, unknown> : {};
+    return {
+      vitaminaNombre: String(item.vitaminaNombre ?? '').trim(),
+      dosis: String(item.dosis ?? '').trim(),
+      via: String(item.via ?? '').trim(),
+      observaciones: String(item.observaciones ?? '').trim()
+    };
+  });
+  if (aplicaciones.some(item => !item.vitaminaNombre || !item.dosis || !item.via ||
+    item.vitaminaNombre.length > 200 || item.dosis.length > 100 || item.via.length > 100)) {
+    return NextResponse.json({ error: 'Complete nombre, dosis y vía de cada vitamina o suero y revise la longitud de los datos.' }, { status: 400 });
   }
   try {
     const columnas = await asegurarTablaRecetas();
-    const [result] = await pool.execute<ResultSetHeader>(
-      `INSERT INTO recetas (dni_paciente, nombre_paciente, ${columnas.vitamina}, dosis, via, observaciones) VALUES (?, ?, ?, ?, ?, ?)`,
-      [dni, nombre, vitamina, dosis, String(body.via ?? '').trim(), String(body.observaciones ?? '').trim()]
-    );
-    const [guardado] = await pool.query<RowDataPacket[]>(
-      `SELECT ${columnas.fecha} AS "fechaAplicacion" FROM recetas WHERE id = ?`, [result.insertId]
-    );
-    return NextResponse.json({ success: true, id: result.insertId, fechaAplicacion: guardado[0]?.fechaAplicacion }, { status: 201 });
+    const cliente = await pgPool.connect();
+    try {
+      const fechaComun = new Date();
+      const guardados = [];
+      await cliente.query('BEGIN');
+      for (const item of aplicaciones) {
+        const { rows } = await cliente.query<{ id: string | number; fechaAplicacion: Date }>(
+          `INSERT INTO recetas (dni_paciente, nombre_paciente, ${columnas.vitamina}, dosis, via, observaciones, ${columnas.fecha})
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING id, ${columnas.fecha} AS "fechaAplicacion"`,
+          [dni, nombre, item.vitaminaNombre, item.dosis, item.via, item.observaciones, fechaComun]
+        );
+        guardados.push({
+          id: Number(rows[0].id),
+          dni_paciente: dni,
+          ...item,
+          fechaAplicacion: rows[0].fechaAplicacion,
+          activo: true
+        });
+      }
+      await cliente.query('COMMIT');
+      return NextResponse.json({ success: true, data: guardados, id: guardados[0].id, fechaAplicacion: guardados[0].fechaAplicacion }, { status: 201 });
+    } catch (error) {
+      await cliente.query('ROLLBACK');
+      throw error;
+    } finally {
+      cliente.release();
+    }
   } catch (error) {
     console.error('Error al guardar vitamina:', error);
     const codigo = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
