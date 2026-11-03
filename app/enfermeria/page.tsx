@@ -79,7 +79,7 @@ const CAMPOS_DETALLE: { campo: keyof Triaje; etiqueta: string }[] = [
   { campo: 'observaciones', etiqueta: 'Observaciones' }
 ];
 
-const DATOS_OPCIONALES_COLUMNAS = [
+const DATOS_OPCIONALES_COMPOSICION = [
   [
     { campo: 'imc', etiqueta: 'IMC', ejemplo: 'Ej: 24.5' },
     { campo: 'grasa_porcentaje', etiqueta: 'Grasa %', ejemplo: 'Ej: 22%' },
@@ -95,22 +95,21 @@ const DATOS_OPCIONALES_COLUMNAS = [
     { campo: 'edad_metabolica', etiqueta: 'Edad Metabólica', ejemplo: 'Ej: 32 años' },
     { campo: 'hb', etiqueta: 'HB', ejemplo: 'Ej: 13.5' },
   ],
-  [
-    { campo: 'globulos_rojos', etiqueta: 'G. Rojos', ejemplo: 'Ej: 4.5 mill' },
-    { campo: 'globulos_blancos', etiqueta: 'G. Blancos', ejemplo: 'Ej: 7500' },
-    { campo: 'hb_glicosilada', etiqueta: 'HB. Glicosilada', ejemplo: 'Ej: 5.4%' },
-    { campo: 'vcm', etiqueta: 'VCM', ejemplo: 'Ej: 88 fL' },
-    { campo: 'glucosa', etiqueta: 'Glucosa', ejemplo: 'Ej: 95 mg/dL' },
-    { campo: 'colesterol', etiqueta: 'Colesterol', ejemplo: 'Ej: 180 mg/dL' },
-    { campo: 'trigliceridos', etiqueta: 'Triglicéridos', ejemplo: 'Ej: 140 mg/dL' },
-    { campo: 'creatinina', etiqueta: 'Creatinina', ejemplo: 'Ej: 0.9 mg/dL' },
-  ],
-  [
-    { campo: 'urea', etiqueta: 'Urea', ejemplo: 'Ej: 25 mg/dL' },
-    { campo: 'tgo', etiqueta: 'TGO', ejemplo: 'Ej: 22 U/L' },
-    { campo: 'tgp', etiqueta: 'TGP', ejemplo: 'Ej: 25 U/L' },
-    { campo: 't3_t4_tsh', etiqueta: 'T3-T4-TSH', ejemplo: 'Ej: TSH 2.1' },
-  ],
+] as const;
+
+const DATOS_OPCIONALES_LABORATORIO = [
+  { campo: 'globulos_rojos', etiqueta: 'G. Rojos', ejemplo: 'Ej: 4.5 mill' },
+  { campo: 'globulos_blancos', etiqueta: 'G. Blancos', ejemplo: 'Ej: 7500' },
+  { campo: 'hb_glicosilada', etiqueta: 'HB. Glicosilada', ejemplo: 'Ej: 5.4%' },
+  { campo: 'vcm', etiqueta: 'VCM', ejemplo: 'Ej: 88 fL' },
+  { campo: 'glucosa', etiqueta: 'Glucosa', ejemplo: 'Ej: 95 mg/dL' },
+  { campo: 'colesterol', etiqueta: 'Colesterol', ejemplo: 'Ej: 180 mg/dL' },
+  { campo: 'trigliceridos', etiqueta: 'Triglicéridos', ejemplo: 'Ej: 140 mg/dL' },
+  { campo: 'creatinina', etiqueta: 'Creatinina', ejemplo: 'Ej: 0.9 mg/dL' },
+  { campo: 'urea', etiqueta: 'Urea', ejemplo: 'Ej: 25 mg/dL' },
+  { campo: 'tgo', etiqueta: 'TGO', ejemplo: 'Ej: 22 U/L' },
+  { campo: 'tgp', etiqueta: 'TGP', ejemplo: 'Ej: 25 U/L' },
+  { campo: 't3_t4_tsh', etiqueta: 'T3-T4-TSH', ejemplo: 'Ej: TSH 2.1' },
 ] as const;
 
 const DATOS_OPCIONALES_ADICIONALES = [
@@ -831,9 +830,9 @@ function EnfermeriaContent() {
                 </button>
                 {mostrarOpcionales && (
                   <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 animate-fadeIn text-xs">
-                    <div className="overflow-x-auto">
-                      <div className="grid grid-cols-4 gap-2 min-w-[800px]">
-                        {DATOS_OPCIONALES_COLUMNAS.map((columna, indice) => (
+                    <div className="rounded-xl border border-slate-200 bg-white p-3 overflow-x-auto">
+                      <div className="grid grid-cols-2 gap-4 min-w-[560px]">
+                        {DATOS_OPCIONALES_COMPOSICION.map((columna, indice) => (
                           <div key={indice} className="flex flex-col gap-2 min-w-0">
                             {columna.map(({ campo, etiqueta, ejemplo }) => (
                               <label key={campo} className="block min-w-0">
@@ -852,6 +851,26 @@ function EnfermeriaContent() {
                             ))}
                           </div>
                         ))}
+                      </div>
+                    </div>
+                    <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+                      <span className="block text-[11px] font-extrabold text-teal-800 uppercase mb-2">Datos de laboratorio</span>
+                      <div className="overflow-x-auto">
+                        <div className="grid grid-cols-4 gap-3 min-w-[800px]">
+                          {DATOS_OPCIONALES_LABORATORIO.map(({ campo, etiqueta, ejemplo }) => (
+                            <label key={campo} className="block min-w-0">
+                              <span className="block text-[10px] font-bold text-slate-700 mb-1">{etiqueta}</span>
+                              <input
+                                type="text"
+                                name={campo}
+                                value={form[campo]}
+                                onChange={handleChange}
+                                placeholder={ejemplo}
+                                className="w-full p-2 rounded-lg border border-slate-300 bg-white font-bold text-xs"
+                              />
+                            </label>
+                          ))}
+                        </div>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
