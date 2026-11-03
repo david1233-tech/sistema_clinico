@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 
@@ -25,6 +25,15 @@ interface Tratamiento {
   observaciones: string;
   fechaAplicacion: string;
   activo: boolean;
+}
+
+interface VitaminaAdicional {
+  id: number;
+  vitaminaNombre: string;
+  dosis: string;
+  via: string;
+  viaOpcion: string;
+  observaciones: string;
 }
 
 const CATALOGO_VITAMINAS = Array.from(new Set(`19 Plus
@@ -163,6 +172,8 @@ function VitaminasPageContent() {
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [registroEditando, setRegistroEditando] = useState<Tratamiento | null>(null);
+  const [vitaminasAdicionales, setVitaminasAdicionales] = useState<VitaminaAdicional[]>([]);
+  const siguienteAdicionalId = useRef(0);
   
   const [formVitamina, setFormVitamina] = useState({
     vitaminaNombre: '',
@@ -269,10 +280,11 @@ function VitaminasPageContent() {
   const handleSeleccionarPaciente = (p: Paciente) => {
     if (saving) return;
     if (p.dni_paciente === pacienteSeleccionado?.dni_paciente) return;
-    if ((registroEditando || Object.values(formVitamina).some(Boolean)) &&
+    if ((registroEditando || Object.values(formVitamina).some(Boolean) || vitaminasAdicionales.length > 0) &&
       !confirm('Los datos del formulario que aún no guardó se perderán. ¿Cambiar de paciente?')) return;
     setPacienteSeleccionado(p);
     setRegistroEditando(null);
+    setVitaminasAdicionales([]);
     setFormVitamina({ vitaminaNombre: '', dosis: '', via: '', observaciones: '' });
     setViaOpcion('');
     setBusquedaVitamina('');
@@ -293,13 +305,29 @@ function VitaminasPageContent() {
       observaciones: ''
     });
     setViaOpcion('');
+    setVitaminasAdicionales([]);
     setBusquedaVitamina('');
     setMostrarCatalogo(false);
   };
 
+  const handleAgregarVitamina = () => {
+    if (vitaminasAdicionales.length >= 49) return;
+    siguienteAdicionalId.current += 1;
+    setVitaminasAdicionales(prev => [...prev, {
+      id: siguienteAdicionalId.current,
+      vitaminaNombre: '', dosis: '', via: '', viaOpcion: '', observaciones: ''
+    }]);
+  };
+
+  const actualizarVitaminaAdicional = (id: number, cambio: Partial<VitaminaAdicional>) => {
+    setVitaminasAdicionales(prev => prev.map(item => item.id === id ? { ...item, ...cambio } : item));
+  };
+
   const handleEditarTratamiento = (tratamiento: Tratamiento) => {
     if (saving) return;
+    if (vitaminasAdicionales.length > 0 && !confirm('Las vitaminas adicionales sin guardar se perderán. ¿Editar este registro?')) return;
     setRegistroEditando(tratamiento);
+    setVitaminasAdicionales([]);
     setFormVitamina({
       vitaminaNombre: tratamiento.vitaminaNombre,
       dosis: tratamiento.dosis || '',
@@ -320,6 +348,17 @@ function VitaminasPageContent() {
   const handleGuardarVitamina = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pacienteSeleccionado) return;
+    const aplicaciones = [formVitamina, ...vitaminasAdicionales.map(({ vitaminaNombre, dosis, via, observaciones }) => ({ vitaminaNombre, dosis, via, observaciones }))]
+      .map(item => ({
+        vitaminaNombre: item.vitaminaNombre.trim(),
+        dosis: item.dosis.trim(),
+        via: item.via.trim(),
+        observaciones: item.observaciones.trim()
+      }));
+    if (aplicaciones.some(item => !item.vitaminaNombre || !item.dosis || !item.via)) {
+      alert('Complete el nombre, la dosis y la vía de cada vitamina o suero.');
+      return;
+    }
     try {
       setSaving(true);
       const response = await fetch('/api/vitaminas', {
@@ -329,36 +368,26 @@ function VitaminasPageContent() {
           ...formVitamina,
           dni_paciente: pacienteSeleccionado.dni_paciente,
           nombre_paciente: pacienteSeleccionado.nombre_paciente,
-          ...(registroEditando ? { id: registroEditando.id } : {})
+          ...(registroEditando ? { id: registroEditando.id } : { tratamientos: aplicaciones })
         })
       });
       if (!response.ok) throw new Error((await response.json()).error || 'No se pudo guardar el tratamiento');
-      const guardado: { id?: number; fechaAplicacion?: string } = await response.json();
-      const datos = {
-        vitaminaNombre: formVitamina.vitaminaNombre.trim(),
-        dosis: formVitamina.dosis.trim(),
-        via: formVitamina.via.trim(),
-        observaciones: formVitamina.observaciones.trim()
-      };
+      const guardado: { data?: Tratamiento[] } = await response.json();
       let listaActualizada: Tratamiento[];
       if (registroEditando) {
-        listaActualizada = tratamientos.map(t => t.id === registroEditando.id ? { ...t, ...datos } : t);
+        listaActualizada = tratamientos.map(t => t.id === registroEditando.id ? { ...t, ...aplicaciones[0] } : t);
       } else {
-        if (!guardado.id) throw new Error('El tratamiento se guardó, pero no se recibió su identificador. Recargue la página antes de volver a intentar.');
-        listaActualizada = [{
-          id: guardado.id,
-          dni_paciente: pacienteSeleccionado.dni_paciente,
-          ...datos,
-          fechaAplicacion: guardado.fechaAplicacion || new Date().toISOString(),
-          activo: true
-        }, ...tratamientos];
+        if (!Array.isArray(guardado.data) || guardado.data.length !== aplicaciones.length) {
+          throw new Error('Las vitaminas se guardaron, pero no se recibió la confirmación completa. Recargue la página antes de volver a intentar.');
+        }
+        listaActualizada = [...guardado.data.slice().reverse(), ...tratamientos];
       }
       setTratamientos(listaActualizada);
       setPacientes(prev => prev.map(p => p.dni_paciente === pacienteSeleccionado.dni_paciente ? actualizarResumenPaciente(p, listaActualizada) : p));
       setPacienteSeleccionado(prev => prev?.dni_paciente === pacienteSeleccionado.dni_paciente ? actualizarResumenPaciente(prev, listaActualizada) : prev);
       setRegistroEditando(null);
       handleLimpiarFormulario();
-      alert(registroEditando ? '✅ Tratamiento actualizado.' : `✅ Tratamiento guardado para ${pacienteSeleccionado.nombre_paciente || pacienteSeleccionado.dni_paciente}`);
+      alert(registroEditando ? '✅ Tratamiento actualizado.' : `✅ ${aplicaciones.length} ${aplicaciones.length === 1 ? 'tratamiento guardado' : 'tratamientos guardados'} para ${pacienteSeleccionado.nombre_paciente || pacienteSeleccionado.dni_paciente}`);
     } catch (err) {
       console.error('Error guardando vitamina:', err);
       alert(err instanceof Error ? err.message : 'No se pudo guardar el tratamiento');
@@ -716,6 +745,62 @@ function VitaminasPageContent() {
                         className="w-full p-3 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600 focus:bg-white resize-y"
                       />
                     </div>
+                    {!registroEditando && (
+                      <div className="rounded-2xl border border-teal-200 bg-teal-50/70 p-4 space-y-4">
+                        <div>
+                          <h4 className="m-0 text-sm font-extrabold text-teal-900">Vitaminas o sueros de esta misma cita</h4>
+                          <p className="m-0 mt-1 text-xs text-teal-800">Puede agregar varias aplicaciones. Cada una tendrá su propia dosis, vía y observaciones.</p>
+                        </div>
+                        {vitaminasAdicionales.map((item, indice) => (
+                          <div key={item.id} className="rounded-xl border border-sky-200 bg-white p-4 space-y-3 shadow-sm">
+                            <div className="flex items-center justify-between gap-3">
+                              <strong className="text-xs text-sky-900">Vitamina o suero adicional {indice + 2}</strong>
+                              <button type="button" onClick={() => setVitaminasAdicionales(prev => prev.filter(v => v.id !== item.id))} disabled={saving} className="text-xs font-bold text-rose-700 hover:text-rose-900 cursor-pointer">Quitar</button>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <label className="block text-[11px] font-bold text-slate-700">
+                                Nombre / tipo *
+                                <input type="text" list="catalogo-vitaminas-adicionales" value={item.vitaminaNombre} onChange={e => actualizarVitaminaAdicional(item.id, { vitaminaNombre: e.target.value })} placeholder="Escriba para buscar o elegir..." required className="mt-1 w-full p-2.5 rounded-xl border border-sky-200 bg-sky-50/40 text-slate-900 text-xs font-semibold outline-none focus:border-teal-600" />
+                              </label>
+                              <label className="block text-[11px] font-bold text-slate-700">
+                                Dosis / cantidad *
+                                <input type="text" value={item.dosis} onChange={e => actualizarVitaminaAdicional(item.id, { dosis: e.target.value })} placeholder="Ej: 1 ampolla" required className="mt-1 w-full p-2.5 rounded-xl border border-sky-200 bg-sky-50/40 text-slate-900 text-xs font-semibold outline-none focus:border-teal-600" />
+                              </label>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <label className="block text-[11px] font-bold text-slate-700">
+                                Vía de administración *
+                                <select value={item.viaOpcion} onChange={e => {
+                                  const opcion = e.target.value;
+                                  actualizarVitaminaAdicional(item.id, { viaOpcion: opcion, via: opcion === 'Otra' ? '' : opcion });
+                                }} required className="mt-1 w-full p-2.5 rounded-xl border border-sky-200 bg-white text-slate-900 text-xs font-semibold outline-none focus:border-teal-600">
+                                  <option value="">Seleccionar vía...</option>
+                                  <option value="Endovenosa">Endovenosa</option>
+                                  <option value="Intramuscular">Intramuscular</option>
+                                  <option value="Otra">Otra (escribir)</option>
+                                </select>
+                              </label>
+                              {item.viaOpcion === 'Otra' && (
+                                <label className="block text-[11px] font-bold text-slate-700">
+                                  Especifique la vía *
+                                  <input type="text" value={item.via} onChange={e => actualizarVitaminaAdicional(item.id, { via: e.target.value })} required className="mt-1 w-full p-2.5 rounded-xl border border-sky-200 bg-white text-slate-900 text-xs font-semibold outline-none focus:border-teal-600" />
+                                </label>
+                              )}
+                            </div>
+                            <label className="block text-[11px] font-bold text-slate-700">
+                              Observaciones
+                              <textarea rows={2} value={item.observaciones} onChange={e => actualizarVitaminaAdicional(item.id, { observaciones: e.target.value })} placeholder="Detalles de esta aplicación..." className="mt-1 w-full p-2.5 rounded-xl border border-sky-200 bg-white text-slate-900 text-xs font-semibold outline-none focus:border-teal-600 resize-y" />
+                            </label>
+                          </div>
+                        ))}
+                        <datalist id="catalogo-vitaminas-adicionales">
+                          {CATALOGO_VITAMINAS.map(nombre => <option key={nombre} value={nombre} />)}
+                        </datalist>
+                        <button type="button" onClick={handleAgregarVitamina} disabled={saving || vitaminasAdicionales.length >= 49} className="w-full rounded-xl border border-dashed border-teal-500 bg-white px-4 py-2.5 text-xs font-extrabold text-teal-800 hover:bg-teal-100 cursor-pointer disabled:opacity-50">
+                          ＋ Agregar otra vitamina o suero
+                        </button>
+                      </div>
+                    )}
                     <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
                       <button
                         type="button"
