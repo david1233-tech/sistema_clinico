@@ -831,26 +831,28 @@ function EnfermeriaContent() {
                 </button>
                 {mostrarOpcionales && (
                   <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 animate-fadeIn text-xs">
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-2">
-                      {DATOS_OPCIONALES_COLUMNAS.map((columna, indice) => (
-                        <div key={indice} className="flex flex-col gap-2">
-                          {columna.map(({ campo, etiqueta, ejemplo }) => (
-                            <label key={campo} className="block min-w-0">
-                              <span className="block text-[10px] font-bold text-slate-700 mb-1">{etiqueta}</span>
-                              <input
-                                type={campo === 'hb' ? 'number' : 'text'}
-                                inputMode={campo === 'imc' ? 'decimal' : undefined}
-                                step={campo === 'hb' ? '0.1' : undefined}
-                                name={campo}
-                                value={form[campo]}
-                                onChange={handleChange}
-                                placeholder={ejemplo}
-                                className="w-full p-2 rounded-lg border border-slate-300 bg-white font-bold text-xs"
-                              />
-                            </label>
-                          ))}
-                        </div>
-                      ))}
+                    <div className="overflow-x-auto">
+                      <div className="grid grid-cols-4 gap-2 min-w-[800px]">
+                        {DATOS_OPCIONALES_COLUMNAS.map((columna, indice) => (
+                          <div key={indice} className="flex flex-col gap-2 min-w-0">
+                            {columna.map(({ campo, etiqueta, ejemplo }) => (
+                              <label key={campo} className="block min-w-0">
+                                <span className="block text-[10px] font-bold text-slate-700 mb-1">{etiqueta}</span>
+                                <input
+                                  type={campo === 'hb' ? 'number' : 'text'}
+                                  inputMode={campo === 'imc' ? 'decimal' : undefined}
+                                  step={campo === 'hb' ? '0.1' : undefined}
+                                  name={campo}
+                                  value={form[campo]}
+                                  onChange={handleChange}
+                                  placeholder={ejemplo}
+                                  className="w-full p-2 rounded-lg border border-slate-300 bg-white font-bold text-xs"
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
                       {DATOS_OPCIONALES_ADICIONALES.map(({ campo, etiqueta, ejemplo }) => (
