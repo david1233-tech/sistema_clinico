@@ -16,11 +16,134 @@ interface Paciente {
   fechaAplicacion?: string;
 }
 
+interface Tratamiento {
+  id: number;
+  dni_paciente: string;
+  vitaminaNombre: string;
+  dosis: string;
+  via: string;
+  observaciones: string;
+  fechaAplicacion: string;
+  activo: boolean;
+}
+
+const CATALOGO_VITAMINAS = Array.from(new Set(`19 Plus
+Ametil Z M
+Amin Lsi
+Amin Tri
+Aminos Plus
+Bicarbonato De Sodio
+C Joven Plus - Mega Cóctel Antiedad
+Calcio
+Cartilago
+Cerebro
+Cholo 2
+Cholo 2 - Lote 2
+Cock Tail Of Myers
+Cocktail Energy Plus
+Cocktail Lipolysis
+Coctel Alz
+Colon
+Comlejo B Solucion Inyectable
+Corazon
+Cusing L-Carnitina
+Cutis Compuesto
+Dbet 115
+Denova - Glutathione
+Dfes 106
+Drenatox
+Echinacea
+Echinacea Lote 2
+Estomago
+Exohealer
+G- Pancreadren
+G-Dermodren
+G-Digesdren
+G-Intesdren
+G-M18 Plus
+G-Mucodren
+G-Nervodren
+G-Pancreadren
+G-Uridren
+Ganglio Linfatico
+Gushing  Power B
+Gushing Chelating-G
+Gusing  Cynara Scolymus D3
+Gusing G-Renox
+Gusing Glutation
+Gusing Methylene
+Gusing Uva Ursi D3
+Gusing Xanser
+Herpes Zoster
+Hierro Nim Hs
+Higado
+Hueso
+Inm 103
+Jutussin R8
+Linea: Ala+ ( Alfa Lipolco)
+Linfocitos T Y B
+Lymphdiaral
+Lymphdiaral Lote 2
+Magnesio
+Medula Espinal
+Msm
+Mucosa Gastrointestinal
+Nad +
+Nad+
+Nervio Ciatico
+Niquel
+Nro 102
+Ovario
+Oxis
+Pancreas
+Pasconal Forte
+Pasconal Forte - Lote 2
+Piel
+Prostata
+Prostata
+Pulmon
+Reckeweg R18
+Reckeweg R27
+Reckeweg R37
+Reckeweg R37
+Reckeweg R55
+Reckeweg R6
+Reckeweg R73
+Reckeweg Tr14
+Reckeweg Tr5
+Reckeweg Tr7
+Retatrutide
+Riñon
+Selenio
+Silimarina
+Tiroides
+Tónico De Alfalfa R95
+Trutide
+Utero
+Venas
+Virus Papiloma Humano
+Vitamin C  50G
+Vitamin C 50G
+Vitamin C 7,5Gc
+Vitamina B12
+Vitamina C - 10G
+Vitamina C - 15G
+Vitamina C - 25G
+Vitamina C Con Ala+ (Alfa Lipolco)
+Vtb5
+Vtb7
+Zing`.split('\n')));
+
+const normalizarBusqueda = (valor: string) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
 function VitaminasPageContent() {
   const searchParams = useSearchParams();
   const dniParam = searchParams.get('dni');
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [tratamientos, setTratamientos] = useState<Tratamiento[]>([]);
   const [busqueda, setBusqueda] = useState<string>('');
+  const [busquedaVitamina, setBusquedaVitamina] = useState('');
+  const [mostrarCatalogo, setMostrarCatalogo] = useState(false);
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
@@ -52,28 +175,16 @@ function VitaminasPageContent() {
         }
       }
     }
-    if (dniTarget) {
+    if (dniTarget && dniTarget !== pacienteSeleccionado?.dni_paciente) {
       const encontrado = pacientes.find(p => p.dni_paciente === dniTarget);
       if (encontrado) {
         setPacienteSeleccionado(encontrado);
-        setFormVitamina({
-          vitaminaNombre: encontrado.vitaminaNombre || '',
-          dosis: encontrado.dosis || '',
-          via: encontrado.via || '',
-          observaciones: encontrado.observaciones || ''
-        });
         return;
       }
     }
     
     if (!pacienteSeleccionado && pacientes.length > 0) {
       setPacienteSeleccionado(pacientes[0]);
-      setFormVitamina({
-        vitaminaNombre: pacientes[0].vitaminaNombre || '',
-        dosis: pacientes[0].dosis || '',
-        via: pacientes[0].via || '',
-        observaciones: pacientes[0].observaciones || ''
-      });
     }
   }, [dniParam, pacientes]);
 
@@ -92,7 +203,8 @@ function VitaminasPageContent() {
       }
       const resVitaminas = await fetch('/api/vitaminas', { cache: 'no-store' });
       if (!resVitaminas.ok) throw new Error((await resVitaminas.json()).error || 'No se pudieron cargar los tratamientos');
-      const tratamientos: any[] = await resVitaminas.json();
+      const tratamientosCargados: Tratamiento[] = await resVitaminas.json();
+      setTratamientos(tratamientosCargados);
       const mapaPacientes = new Map<string, Paciente>();
       basePacientesData.forEach((p) => {
         const dni = p.dni || p.dni_paciente;
@@ -124,7 +236,7 @@ function VitaminasPageContent() {
         }
       });
       const ultimoPorDni = new Map<string, any>();
-      tratamientos.forEach(t => {
+      tratamientosCargados.forEach(t => {
         if (t.dni_paciente && !ultimoPorDni.has(t.dni_paciente)) ultimoPorDni.set(t.dni_paciente, t);
       });
       ultimoPorDni.forEach((t, dni) => {
@@ -150,12 +262,9 @@ function VitaminasPageContent() {
 
   const handleSeleccionarPaciente = (p: Paciente) => {
     setPacienteSeleccionado(p);
-    setFormVitamina({
-      vitaminaNombre: p.vitaminaNombre || '',
-      dosis: p.dosis || '',
-      via: p.via || '',
-      observaciones: p.observaciones || ''
-    });
+    setFormVitamina({ vitaminaNombre: '', dosis: '', via: '', observaciones: '' });
+    setBusquedaVitamina('');
+    setMostrarCatalogo(false);
     
     localStorage.setItem('paciente_activo_vital_salud', JSON.stringify({
       dni: p.dni_paciente,
@@ -189,6 +298,8 @@ function VitaminasPageContent() {
       via: '',
       observaciones: ''
     });
+    setBusquedaVitamina('');
+    setMostrarCatalogo(false);
   };
 
   const handleGuardarVitamina = async (e: React.FormEvent) => {
@@ -196,7 +307,7 @@ function VitaminasPageContent() {
     if (!pacienteSeleccionado) return;
     try {
       setSaving(true);
-      const fechaActual = new Date().toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
+      const fechaActual = new Date().toISOString();
       
       const pacienteActualizado: Paciente = {
         ...pacienteSeleccionado,
@@ -211,6 +322,17 @@ function VitaminasPageContent() {
         body: JSON.stringify(pacienteActualizado)
       });
       if (!response.ok) throw new Error((await response.json()).error || 'No se pudo guardar el tratamiento');
+      const guardado: { id: number } = await response.json();
+      setTratamientos(prev => [{
+        id: guardado.id,
+        dni_paciente: pacienteSeleccionado.dni_paciente,
+        vitaminaNombre: formVitamina.vitaminaNombre.trim(),
+        dosis: formVitamina.dosis.trim(),
+        via: formVitamina.via.trim(),
+        observaciones: formVitamina.observaciones.trim(),
+        fechaAplicacion: fechaActual,
+        activo: true
+      }, ...prev]);
 
       setPacientes(prev =>
         prev.map(p => (p.id === pacienteSeleccionado.id ? pacienteActualizado : p))
@@ -248,6 +370,7 @@ function VitaminasPageContent() {
         setPacientes(prev =>
           prev.map(p => (p.id === pacienteSeleccionado.id ? pacienteSinVitamina : p))
         );
+        setTratamientos(prev => prev.map(t => t.dni_paciente === pacienteSinVitamina.dni_paciente ? { ...t, activo: false } : t));
         setPacienteSeleccionado(pacienteSinVitamina);
         setFormVitamina({ vitaminaNombre: '', dosis: '', via: '', observaciones: '' });
       } catch (err) {
@@ -264,6 +387,8 @@ function VitaminasPageContent() {
 
   const totalAplicados = pacientes.filter(p => p.aplicaVitamina).length;
   const totalPendientes = pacientes.length - totalAplicados;
+  const tratamientosPaciente = tratamientos.filter(t => t.dni_paciente === pacienteSeleccionado?.dni_paciente);
+  const opcionesVitamina = CATALOGO_VITAMINAS.filter(nombre => normalizarBusqueda(nombre).startsWith(normalizarBusqueda(busquedaVitamina)));
 
   return (
     <div className="flex min-h-screen bg-slate-100 font-sans text-slate-900">
@@ -466,6 +591,43 @@ function VitaminasPageContent() {
                           className="w-full p-3 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600 focus:bg-white"
                         />
                       </div>
+                      <div className="relative">
+                        <label htmlFor="buscar-vitamina" className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
+                          BUSCAR VITAMINA O SUERO
+                        </label>
+                        <input
+                          id="buscar-vitamina"
+                          type="search"
+                          autoComplete="off"
+                          value={busquedaVitamina}
+                          onChange={(e) => { setBusquedaVitamina(e.target.value); setMostrarCatalogo(true); }}
+                          onFocus={() => setMostrarCatalogo(true)}
+                          placeholder="Escriba las primeras letras..."
+                          className="w-full p-3 rounded-xl border border-slate-300 bg-white font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600"
+                          role="combobox"
+                          aria-autocomplete="list"
+                          aria-controls="opciones-vitaminas"
+                          aria-expanded={mostrarCatalogo}
+                        />
+                        {mostrarCatalogo && (
+                          <div id="opciones-vitaminas" className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-300 bg-white shadow-lg">
+                            {opcionesVitamina.length > 0 ? opcionesVitamina.map(nombre => (
+                              <button
+                                key={nombre}
+                                type="button"
+                                onClick={() => {
+                                  setFormVitamina(prev => ({ ...prev, vitaminaNombre: nombre }));
+                                  setBusquedaVitamina(nombre);
+                                  setMostrarCatalogo(false);
+                                }}
+                                className="block w-full px-3 py-2 text-left text-xs md:text-sm font-semibold text-slate-800 hover:bg-teal-50 cursor-pointer"
+                              >
+                                {nombre}
+                              </button>
+                            )) : <p className="m-0 p-3 text-xs text-slate-500">No se encontraron opciones. Puede escribir el nombre manualmente.</p>}
+                          </div>
+                        )}
+                      </div>
                       <div>
                         <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
                           DOSIS / CANTIDAD *
@@ -521,6 +683,26 @@ function VitaminasPageContent() {
                       </button>
                     </div>
                   </form>
+                  <div className="bg-white rounded-2xl border border-slate-200 p-5 md:p-6 shadow-sm">
+                    <h3 className="m-0 text-sm md:text-base font-extrabold text-teal-900">Historial de vitaminas y sueros ({tratamientosPaciente.length})</h3>
+                    {tratamientosPaciente.length === 0 ? (
+                      <p className="text-xs text-slate-500 mb-0">Este paciente aún no tiene tratamientos guardados.</p>
+                    ) : (
+                      <div className="mt-4 space-y-3 max-h-[520px] overflow-y-auto">
+                        {tratamientosPaciente.map(t => (
+                          <div key={t.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs md:text-sm break-words">
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                              <strong className="text-slate-900">{t.vitaminaNombre}</strong>
+                              <span className="text-slate-500 font-semibold">{t.fechaAplicacion ? new Date(t.fechaAplicacion).toLocaleString('es-PE') : 'Sin fecha'}</span>
+                            </div>
+                            <p className="m-0"><strong>Dosis / cantidad:</strong> {t.dosis || 'No registrada'}</p>
+                            <p className="m-0 mt-1"><strong>Vía de administración:</strong> {t.via || 'No registrada'}</p>
+                            <p className="m-0 mt-1 whitespace-pre-wrap"><strong>Observaciones:</strong> {t.observaciones || 'Sin observaciones'}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
@@ -543,4 +725,3 @@ export default function VitaminasPage() {
     </Suspense>
   );
 }
-
