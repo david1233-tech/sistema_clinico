@@ -79,35 +79,43 @@ const CAMPOS_DETALLE: { campo: keyof Triaje; etiqueta: string }[] = [
   { campo: 'observaciones', etiqueta: 'Observaciones' }
 ];
 
-const DATOS_OPCIONALES_PRIMERA_COLUMNA = [
-  { campo: 'imc', etiqueta: 'IMC', ejemplo: 'Ej: 24.5' },
-  { campo: 'grasa_porcentaje', etiqueta: 'Grasa %', ejemplo: 'Ej: 22%' },
-  { campo: 'grasa_visceral', etiqueta: 'G. Visceral', ejemplo: 'Ej: 8' },
+const DATOS_OPCIONALES_COLUMNAS = [
+  [
+    { campo: 'imc', etiqueta: 'IMC', ejemplo: 'Ej: 24.5' },
+    { campo: 'grasa_porcentaje', etiqueta: 'Grasa %', ejemplo: 'Ej: 22%' },
+    { campo: 'grasa_visceral', etiqueta: 'G. Visceral', ejemplo: 'Ej: 8' },
+    { campo: 'musculo_esqueletico_porcentaje', etiqueta: 'M.MusEque%', ejemplo: 'Ej: 30%' },
+    { campo: 'musculos_porcentaje', etiqueta: 'Músculos%', ejemplo: 'Ej: 40%' },
+  ],
+  [
+    { campo: 'agua_porcentaje', etiqueta: 'Agua %', ejemplo: 'Ej: 55%' },
+    { campo: 'metabolismo', etiqueta: 'Metabolismo', ejemplo: 'Ej: 1450 kcal' },
+    { campo: 'proteina', etiqueta: 'Proteína', ejemplo: 'Ej: 18%' },
+    { campo: 'grado_obesidad_porcentaje', etiqueta: 'Grado de Obesidad%', ejemplo: 'Ej: +12%' },
+    { campo: 'edad_metabolica', etiqueta: 'Edad Metabólica', ejemplo: 'Ej: 32 años' },
+    { campo: 'hb', etiqueta: 'HB', ejemplo: 'Ej: 13.5' },
+  ],
+  [
+    { campo: 'globulos_rojos', etiqueta: 'G. Rojos', ejemplo: 'Ej: 4.5 mill' },
+    { campo: 'globulos_blancos', etiqueta: 'G. Blancos', ejemplo: 'Ej: 7500' },
+    { campo: 'hb_glicosilada', etiqueta: 'HB. Glicosilada', ejemplo: 'Ej: 5.4%' },
+    { campo: 'vcm', etiqueta: 'VCM', ejemplo: 'Ej: 88 fL' },
+    { campo: 'glucosa', etiqueta: 'Glucosa', ejemplo: 'Ej: 95 mg/dL' },
+    { campo: 'colesterol', etiqueta: 'Colesterol', ejemplo: 'Ej: 180 mg/dL' },
+    { campo: 'trigliceridos', etiqueta: 'Triglicéridos', ejemplo: 'Ej: 140 mg/dL' },
+    { campo: 'creatinina', etiqueta: 'Creatinina', ejemplo: 'Ej: 0.9 mg/dL' },
+  ],
+  [
+    { campo: 'urea', etiqueta: 'Urea', ejemplo: 'Ej: 25 mg/dL' },
+    { campo: 'tgo', etiqueta: 'TGO', ejemplo: 'Ej: 22 U/L' },
+    { campo: 'tgp', etiqueta: 'TGP', ejemplo: 'Ej: 25 U/L' },
+    { campo: 't3_t4_tsh', etiqueta: 'T3-T4-TSH', ejemplo: 'Ej: TSH 2.1' },
+  ],
 ] as const;
 
-const DATOS_OPCIONALES_ORDENADOS = [
-  { campo: 'musculo_esqueletico_porcentaje', etiqueta: 'M.MusEque%', ejemplo: 'Ej: 30%' },
-  { campo: 'musculos_porcentaje', etiqueta: 'Músculos%', ejemplo: 'Ej: 40%' },
-  { campo: 'agua_porcentaje', etiqueta: 'Agua %', ejemplo: 'Ej: 55%' },
-  { campo: 'metabolismo', etiqueta: 'Metabolismo', ejemplo: 'Ej: 1450 kcal' },
-  { campo: 'proteina', etiqueta: 'Proteína', ejemplo: 'Ej: 18%' },
-  { campo: 'grado_obesidad_porcentaje', etiqueta: 'Grado de Obesidad%', ejemplo: 'Ej: +12%' },
-  { campo: 'edad_metabolica', etiqueta: 'Edad Metabólica', ejemplo: 'Ej: 32 años' },
+const DATOS_OPCIONALES_ADICIONALES = [
   { campo: 'circunferencia_abdominal', etiqueta: 'Circunferencia Abdominal', ejemplo: 'Ej: 85 cm' },
   { campo: 'frecuencia_respiratoria', etiqueta: 'F. Respiratoria (rpm)', ejemplo: 'Ej: 18' },
-  { campo: 'hb', etiqueta: 'HB', ejemplo: 'Ej: 13.5' },
-  { campo: 'globulos_rojos', etiqueta: 'G. Rojos', ejemplo: 'Ej: 4.5 mill' },
-  { campo: 'globulos_blancos', etiqueta: 'G. Blancos', ejemplo: 'Ej: 7500' },
-  { campo: 'hb_glicosilada', etiqueta: 'HB. Glicosilada', ejemplo: 'Ej: 5.4%' },
-  { campo: 'vcm', etiqueta: 'VCM', ejemplo: 'Ej: 88 fL' },
-  { campo: 'glucosa', etiqueta: 'Glucosa', ejemplo: 'Ej: 95 mg/dL' },
-  { campo: 'colesterol', etiqueta: 'Colesterol', ejemplo: 'Ej: 180 mg/dL' },
-  { campo: 'trigliceridos', etiqueta: 'Triglicéridos', ejemplo: 'Ej: 140 mg/dL' },
-  { campo: 'creatinina', etiqueta: 'Creatinina', ejemplo: 'Ej: 0.9 mg/dL' },
-  { campo: 'urea', etiqueta: 'Urea', ejemplo: 'Ej: 25 mg/dL' },
-  { campo: 'tgo', etiqueta: 'TGO', ejemplo: 'Ej: 22 U/L' },
-  { campo: 'tgp', etiqueta: 'TGP', ejemplo: 'Ej: 25 U/L' },
-  { campo: 't3_t4_tsh', etiqueta: 'T3-T4-TSH', ejemplo: 'Ej: TSH 2.1' },
 ] as const;
 
 function crearFormularioTriaje(dni_paciente = '', nombre_paciente = '', edad = '') {
@@ -824,39 +832,41 @@ function EnfermeriaContent() {
                 {mostrarOpcionales && (
                   <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 animate-fadeIn text-xs">
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-2">
-                      <div className="flex flex-col gap-2">
-                        {DATOS_OPCIONALES_PRIMERA_COLUMNA.map(({ campo, etiqueta, ejemplo }) => (
-                          <label key={campo} className="block min-w-0">
-                            <span className="block text-[10px] font-bold text-slate-700 mb-1">{etiqueta}</span>
-                            <input
-                              type="text"
-                              inputMode={campo === 'imc' ? 'decimal' : undefined}
-                              name={campo}
-                              value={form[campo]}
-                              onChange={handleChange}
-                              placeholder={ejemplo}
-                              className="w-full p-2 rounded-lg border border-slate-300 bg-white font-bold text-xs"
-                            />
-                          </label>
-                        ))}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 lg:col-span-3">
-                        {DATOS_OPCIONALES_ORDENADOS.map(({ campo, etiqueta, ejemplo }) => (
-                          <label key={campo} className="block min-w-0">
-                            <span className="block text-[10px] font-bold text-slate-700 mb-1">{etiqueta}</span>
-                            <input
-                              type={campo === 'hb' || campo === 'frecuencia_respiratoria' ? 'number' : 'text'}
-                              step={campo === 'hb' ? '0.1' : undefined}
-                              min={campo === 'frecuencia_respiratoria' ? '1' : undefined}
-                              name={campo}
-                              value={form[campo]}
-                              onChange={handleChange}
-                              placeholder={ejemplo}
-                              className="w-full p-2 rounded-lg border border-slate-300 bg-white font-bold text-xs"
-                            />
-                          </label>
-                        ))}
-                      </div>
+                      {DATOS_OPCIONALES_COLUMNAS.map((columna, indice) => (
+                        <div key={indice} className="flex flex-col gap-2">
+                          {columna.map(({ campo, etiqueta, ejemplo }) => (
+                            <label key={campo} className="block min-w-0">
+                              <span className="block text-[10px] font-bold text-slate-700 mb-1">{etiqueta}</span>
+                              <input
+                                type={campo === 'hb' ? 'number' : 'text'}
+                                inputMode={campo === 'imc' ? 'decimal' : undefined}
+                                step={campo === 'hb' ? '0.1' : undefined}
+                                name={campo}
+                                value={form[campo]}
+                                onChange={handleChange}
+                                placeholder={ejemplo}
+                                className="w-full p-2 rounded-lg border border-slate-300 bg-white font-bold text-xs"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                      {DATOS_OPCIONALES_ADICIONALES.map(({ campo, etiqueta, ejemplo }) => (
+                        <label key={campo} className="block min-w-0">
+                          <span className="block text-[10px] font-bold text-slate-700 mb-1">{etiqueta}</span>
+                          <input
+                            type={campo === 'frecuencia_respiratoria' ? 'number' : 'text'}
+                            min={campo === 'frecuencia_respiratoria' ? '1' : undefined}
+                            name={campo}
+                            value={form[campo]}
+                            onChange={handleChange}
+                            placeholder={ejemplo}
+                            className="w-full p-2 rounded-lg border border-slate-300 bg-white font-bold text-xs"
+                          />
+                        </label>
+                      ))}
                     </div>
                     <label className="block mt-3">
                       <span className="block text-[10px] font-bold text-slate-700 mb-1">Antecedentes médicos</span>
