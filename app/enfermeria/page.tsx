@@ -643,9 +643,9 @@ function EnfermeriaContent() {
               📋 Registro Clínico Previo
             </button>
           </header>
-          <main className="p-4 md:p-8 flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto w-full items-start">
-            {/* COLUMNA IZQUIERDA: FORMULARIO */}
-            <div className="w-full lg:w-[480px] bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm shrink-0">
+          <main className="p-4 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto w-full items-start">
+            {/* FORMULARIO HORIZONTAL */}
+            <div className="w-full bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="bg-teal-700 p-4 text-white flex items-center gap-3">
                 <span className="text-2xl">🩺</span>
                 <div>
@@ -835,7 +835,7 @@ function EnfermeriaContent() {
                 </button>
                 {mostrarOpcionales && (
                   <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 animate-fadeIn text-xs">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                       {DATOS_OPCIONALES_ORDENADOS.map(({ campo, etiqueta, ejemplo }) => (
                         <label key={campo} className="block min-w-0">
                           <span className="block text-[10px] font-bold text-slate-700 mb-1">{etiqueta}</span>
@@ -912,8 +912,8 @@ function EnfermeriaContent() {
               </form>
             </div>
 
-            {/* COLUMNA DERECHA: HISTORIAL */}
-            <div className="flex-1 w-full bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            {/* HISTORIAL DEBAJO DEL FORMULARIO */}
+            <div className="w-full bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="bg-slate-900 p-4 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-base">📋</div>
