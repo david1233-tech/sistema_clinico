@@ -1,10 +1,12 @@
 'use client';
 import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import InstalarApp from '@/components/InstalarApp';
 
 export default function LoginPage() {
   const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
+  const [mostrarPassword, setMostrarPassword] = useState(false);
   const [error, setError] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -104,13 +106,22 @@ export default function LoginPage() {
               <div className="relative flex items-center">
                 <span className="absolute left-2 text-base select-none">🔒</span>
                 <input 
-                  type="password" 
+                  type={mostrarPassword ? 'text' : 'password'} 
                   value={password} 
                   onChange={(e) => setPassword(e.target.value)} 
                   placeholder="••••••••"
                   required
-                  className="w-full pl-9 pr-3 py-2.5 sm:py-3 border-b-2 border-slate-300 text-sm font-semibold outline-none text-slate-900 bg-transparent transition-all focus:border-purple-600"
+                  className="w-full pl-9 pr-11 py-2.5 sm:py-3 border-b-2 border-slate-300 text-sm font-semibold outline-none text-slate-900 bg-transparent transition-all focus:border-purple-600"
                 />
+                <button
+                  type="button"
+                  onClick={() => setMostrarPassword((visible) => !visible)}
+                  aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  aria-pressed={mostrarPassword}
+                  className="absolute right-2 p-1 text-slate-500 hover:text-purple-700 cursor-pointer"
+                >
+                  {mostrarPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}
+                </button>
               </div>
             </div>
 
@@ -133,4 +144,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
