@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-export type Role = 'doctora' | 'enfermera' | 'recepcion';
+export type Role = 'doctora' | 'enfermera' | 'recepcion' | 'operador';
 export const SESSION_COOKIE = 'vital_session';
 
 type Session = { role: Role; expires: number };
@@ -23,7 +23,7 @@ export function readSession(token: string | undefined, secret: string | undefine
   if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) return null;
   try {
     const session = JSON.parse(Buffer.from(payload, 'base64url').toString()) as Session;
-    if (!['doctora', 'enfermera', 'recepcion'].includes(session.role) || !Number.isFinite(session.expires) || session.expires < Date.now()) return null;
+    if (!['doctora', 'enfermera', 'recepcion', 'operador'].includes(session.role) || !Number.isFinite(session.expires) || session.expires < Date.now()) return null;
     return session;
   } catch {
     return null;
@@ -33,6 +33,13 @@ export function readSession(token: string | undefined, secret: string | undefine
 export function allows(role: Role, pathname: string, method: string) {
   if (role === 'doctora') return true;
   const isGet = method === 'GET' || method === 'HEAD';
+  const isPath = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
+  if (role === 'operador') {
+    if (isPath('/api/logout')) return true;
+    if (isPath('/api/pacientes') || isPath('/api/triaje') || isPath('/api/citas') || isPath('/api/vitaminas')) return true;
+    if (isPath('/api/reniec') || isPath('/api/consulta') || isPath('/api/recetas')) return isGet;
+    return ['/recepcion', '/enfermeria', '/agenda', '/vitaminas'].some(isPath);
+  }
   if (pathname.startsWith('/api/')) {
     if (pathname === '/api/logout') return true;
     if (pathname.startsWith('/api/pacientes')) return true;
@@ -49,4 +56,3 @@ export function allows(role: Role, pathname: string, method: string) {
   if (['/agenda', '/caja'].some(path => pathname.startsWith(path))) return role === 'recepcion';
   return false;
 }
-
