@@ -444,6 +444,35 @@ function EnfermeriaContent() {
     setDniHistorial(null);
   };
 
+  const iniciarNuevoTriaje = (registro: Triaje) => {
+    if (saving) return;
+    if (registroPendienteId) {
+      alert('Termine de subir los adjuntos pendientes antes de crear otro registro.');
+      return;
+    }
+    const hayDatosSinGuardar = pendientes.length > 0 || Object.entries(form).some(([campo, valor]) =>
+      !['dni_paciente', 'nombre_paciente', 'edad', 'archivo_adjunto'].includes(campo) && Boolean(valor)
+    );
+    if (hayDatosSinGuardar && !confirm('Los datos que aún no guardó en el formulario se perderán. ¿Continuar?')) return;
+
+    adjuntosRequestRef.current += 1;
+    cerrarRegistros();
+    setRegistroEditando(null);
+    setRegistroPendienteId(null);
+    setForm(crearFormularioTriaje(
+      registro.dni_paciente,
+      registro.nombre_paciente,
+      registro.edad === null || registro.edad === undefined ? '' : String(registro.edad)
+    ));
+    setAdjuntos([]);
+    setPendientes([]);
+    setCarpetaAbierta(false);
+    setMostrarOpcionales(true);
+    localStorage.setItem('paciente_activo_vital_salud', JSON.stringify({ dni: registro.dni_paciente }));
+    window.dispatchEvent(new Event('paciente_activo_changed'));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const iniciarEdicion = async (registro: Triaje) => {
     if (saving) return;
     if (registroPendienteId) {
@@ -1010,6 +1039,13 @@ function EnfermeriaContent() {
                               className="bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 px-2.5 py-1 rounded-lg text-xs font-extrabold cursor-pointer"
                             >
                               📋 Ver registros ({registros.length})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => iniciarNuevoTriaje(t)}
+                              className="bg-teal-700 hover:bg-teal-800 text-white px-2.5 py-1 rounded-lg text-xs font-extrabold cursor-pointer"
+                            >
+                              ＋ Registrar nuevos datos
                             </button>
                             <button type="button" onClick={() => iniciarEdicion(t)} className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-1 rounded-lg text-xs font-extrabold cursor-pointer">✏️ Editar último</button>
                             <button
