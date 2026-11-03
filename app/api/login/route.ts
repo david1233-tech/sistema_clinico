@@ -6,6 +6,7 @@ const accounts: { username: string; role: Role; name: string; env: string; next:
   { username: 'SusanaVital', role: 'doctora', name: 'Dra. Susana', env: 'DOCTORA_PASSWORD', next: '/dashboard' },
   { username: 'PilarVital', role: 'enfermera', name: 'Enf. Pilar', env: 'ENFERMERA_PASSWORD', next: '/enfermeria' },
   { username: 'GabyVital', role: 'recepcion', name: 'Recep. Gaby', env: 'RECEPCION_PASSWORD', next: '/agenda' },
+  { username: 'Warcry86', role: 'operador', name: 'Warcry86', env: 'WARCRY_PASSWORD', next: '/recepcion' },
 ];
 
 function equal(a: string, b: string) {
@@ -15,7 +16,7 @@ function equal(a: string, b: string) {
 }
 
 export async function POST(request: Request) {
-  if (!process.env.AUTH_SECRET || accounts.some(account => !process.env[account.env])) {
+  if (!process.env.AUTH_SECRET) {
     return NextResponse.json({ error: 'El acceso aún no está configurado en el servidor.' }, { status: 503 });
   }
   let body: { usuario?: unknown; password?: unknown };
@@ -26,7 +27,8 @@ export async function POST(request: Request) {
   }
   const username = typeof body.usuario === 'string' ? body.usuario.trim().toLowerCase() : '';
   const account = accounts.find(item => item.username.toLowerCase() === username);
-  if (!account || typeof body.password !== 'string' || !equal(body.password, process.env[account.env] || '')) {
+  const configuredPassword = account ? process.env[account.env] : undefined;
+  if (!account || typeof body.password !== 'string' || !configuredPassword || !equal(body.password, configuredPassword)) {
     return NextResponse.json({ error: 'Usuario o contraseña incorrectos.' }, { status: 401 });
   }
   const response = NextResponse.json({ success: true, role: account.role, name: account.name, next: account.next });
@@ -39,4 +41,3 @@ export async function POST(request: Request) {
   });
   return response;
 }
-
