@@ -278,12 +278,14 @@ html[data-intro-seen] .intro {
   padding: 16px;
   background: rgb(8 32 45 / .72);
   backdrop-filter: blur(8px);
+  overflow-y: auto;
 }
 .nuevo-paciente-card {
   display: flex;
   flex-direction: column;
   width: min(100%, 600px);
   max-height: min(90dvh, 820px);
+  min-height: 0;
   overflow: hidden;
   border: 1px solid #cfe3e4;
   border-radius: 24px;
@@ -294,7 +296,22 @@ html[data-intro-seen] .intro {
   flex: none;
   background: linear-gradient(125deg, #12384c 0%, #0b7777 100%) !important;
 }
-.nuevo-paciente-body { overflow-y: auto; overscroll-behavior: contain; }
+.nuevo-paciente-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+.triaje-historial-modal { max-height: 90dvh; min-height: 0; }
+.triaje-historial-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
 .nuevo-paciente-body input,
 .nuevo-paciente-body select { transition: border-color .2s ease, box-shadow .2s ease; }
 .nuevo-paciente-body input:focus-visible,
@@ -313,9 +330,21 @@ html[data-intro-seen] .intro {
 }
 
 @media (max-width: 560px) {
-  .nuevo-paciente-overlay { padding: 10px; }
-  .nuevo-paciente-card { max-height: 94dvh; border-radius: 18px; }
-  .nuevo-paciente-body { padding: 18px !important; }
+  .triaje-historial-modal {
+    height: calc(100vh - 16px);
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+  .nuevo-paciente-overlay { padding: 12px; }
+  .nuevo-paciente-card {
+    height: min(660px, calc(100vh - 24px));
+    height: min(660px, calc(100dvh - 24px));
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+    border-radius: 18px;
+  }
+  .nuevo-paciente-card > div:first-child { padding: 14px 18px !important; }
+  .nuevo-paciente-body { padding: 16px !important; }
   .nuevo-paciente-grid { grid-template-columns: minmax(0, 1fr) !important; }
   .nuevo-paciente-actions { flex-direction: column-reverse; }
   .nuevo-paciente-actions button { width: 100%; }

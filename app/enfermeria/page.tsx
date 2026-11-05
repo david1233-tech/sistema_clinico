@@ -940,9 +940,9 @@ function EnfermeriaContent() {
             </div>
 
             {/* Historial accesible desde el encabezado, con búsqueda y páginas. */}
-            {historialAbierto && <div className="fixed inset-0 z-30 bg-slate-950/70 p-3 md:p-8 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Historial de triajes">
-            <div className="w-full max-w-5xl max-h-[90vh] bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xl flex flex-col">
-              <div className="bg-slate-900 p-4 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            {historialAbierto && <div className="fixed inset-0 z-30 bg-slate-950/70 p-2 sm:p-3 md:p-8 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Historial de triajes">
+            <div className="triaje-historial-modal w-full max-w-5xl bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xl flex flex-col">
+              <div className="relative bg-slate-900 p-4 pr-14 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-base">📋</div>
                   <div>
@@ -955,16 +955,16 @@ function EnfermeriaContent() {
                   placeholder="🔍 Buscar DNI o Nombre..."
                   value={filtro}
                   onChange={(e) => { setFiltro(e.target.value); setPaginaHistorial(1); }}
-                  className="w-full sm:w-56 p-2 rounded-xl border border-slate-700 bg-slate-800 text-white text-xs outline-none"
+                  className="w-full sm:w-56 mt-1 sm:mt-0 p-2 rounded-xl border border-slate-700 bg-slate-800 text-white text-xs outline-none"
                 />
-                <button type="button" onClick={() => setHistorialAbierto(false)} className="text-white font-bold" aria-label="Cerrar historial">✕ Cerrar</button>
+                <button type="button" onClick={() => setHistorialAbierto(false)} className="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white font-bold hover:bg-white/20" aria-label="Cerrar historial">✕</button>
               </div>
               <div className="flex items-center gap-1.5 overflow-x-auto border-b border-slate-200 bg-slate-50 px-4 py-3" aria-label="Filtrar pacientes por inicial del primer apellido">
                 <button type="button" onClick={() => { setLetraHistorial(''); setPaginaHistorial(1); }} aria-pressed={!letraHistorial} className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold ${!letraHistorial ? 'bg-teal-700 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}>Todos</button>
                 {letrasHistorial.map(letra => <button key={letra} type="button" onClick={() => { setLetraHistorial(letra); setPaginaHistorial(1); }} aria-pressed={letraHistorial === letra} className={`shrink-0 h-8 w-8 rounded-lg text-xs font-bold ${letraHistorial === letra ? 'bg-teal-700 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-teal-50'}`}>{letra}</button>)}
               </div>
               
-              <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3.5 overflow-y-auto">
+              <div className="triaje-historial-list p-3 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-3.5 overflow-y-auto">
                 {loading ? (
                   <div className="p-8 text-center text-slate-500 text-xs">Cargando registros de triaje...</div>
                 ) : historialAgrupado.length === 0 ? (
@@ -1066,14 +1066,14 @@ function EnfermeriaContent() {
           </main>
         </div>
         {dniHistorial && (
-          <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4 print:hidden" role="dialog" aria-modal="true" aria-label="Registros de triaje del paciente" onClick={cerrarRegistros}>
-            <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
-              <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3 mb-4">
+          <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-2 sm:p-4 print:hidden" role="dialog" aria-modal="true" aria-label="Registros de triaje del paciente" onClick={cerrarRegistros}>
+            <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[calc(100dvh-16px)] sm:max-h-[90dvh] overflow-y-auto p-4 sm:p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="relative flex items-start justify-between gap-3 border-b border-slate-200 pb-3 pr-9 mb-4">
                 <div>
                   <h3 className="m-0 text-base font-extrabold text-teal-900">📋 Registros de triaje</h3>
                   <p className="m-0 text-xs text-slate-600">{registrosPaciente[0]?.nombre_paciente || 'Paciente'} · DNI {dniHistorial} · {registrosPaciente.length} {registrosPaciente.length === 1 ? 'registro' : 'registros'}</p>
                 </div>
-                <button type="button" onClick={cerrarRegistros} className="text-slate-700 font-bold cursor-pointer" aria-label="Cerrar registros">✕</button>
+                <button type="button" onClick={cerrarRegistros} className="absolute top-0 right-0 flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700 font-bold cursor-pointer" aria-label="Cerrar registros">✕</button>
               </div>
               {detalleTriaje ? (
                 <div className="space-y-4">
