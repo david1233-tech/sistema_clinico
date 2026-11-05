@@ -34,7 +34,7 @@ La URL HTTPS de Vercel se puede instalar como aplicación web desde el navegador
 
 El historial de triajes se abre desde el encabezado de Enfermería y muestra pacientes en páginas de 12 tarjetas con búsqueda por nombre o DNI. Los triajes y tratamientos de vitaminas permiten adjuntar hasta 200 imágenes o PDF de 3 MB cada uno por registro. La tabla de adjuntos de vitaminas se crea al usar el módulo; para prepararla manualmente ejecute `database/migrate-vitaminas-adjuntos.sql`.
 
-En dispositivos móviles, el inicio de sesión conserva una sesión segura durante 90 días para no volver a introducir las credenciales al abrir la aplicación. La contraseña no se almacena en el navegador.
+En dispositivos móviles, el inicio de sesión conserva una sesión segura durante 90 días para no volver a introducir las credenciales al abrir la aplicación. El nombre de usuario se recuerda; la contraseña no se almacena en el navegador.
 
 ## Desarrollo local
 

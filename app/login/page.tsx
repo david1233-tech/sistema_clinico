@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [ingresando, setIngresando] = useState(false);
 
   useEffect(() => {
+    setUsuario(localStorage.getItem('last_user_vital_salud') || '');
     fetch('/api/login', { cache: 'no-store' }).then(response => response.json()).then(result => {
       if (result.authenticated && result.next) window.location.replace(result.next);
     }).catch(() => {});
@@ -29,6 +30,7 @@ export default function LoginPage() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'No se pudo iniciar sesión');
       localStorage.setItem('auth_vital_salud', 'true');
+      localStorage.setItem('last_user_vital_salud', usuario.trim());
       localStorage.setItem('user_role', result.role);
       localStorage.setItem('user_name', result.name);
       await new Promise(resolve => setTimeout(resolve, 700));
