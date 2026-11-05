@@ -36,7 +36,7 @@ function asegurarTablaRecetas() {
         SELECT column_name FROM information_schema.columns
         WHERE table_schema = current_schema() AND table_name = 'recetas'
       `);
-      const nombres = new Set(rows.map(row => row.column_name));
+      const nombres = new Set(rows.map((row: { column_name: string }) => row.column_name));
       let nombreVitamina = ['vitaminaNombre', 'vitaminanombre', 'vitamina_nombre', 'nombre_vitamina', 'medicamento']
         .find(nombre => nombres.has(nombre));
       if (!nombreVitamina) {

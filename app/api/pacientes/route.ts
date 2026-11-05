@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
-import { pool } from '@/lib/db';
+import { pgPool, pool } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,11 +73,26 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const [result] = await pool.execute<ResultSetHeader>(
-      'UPDATE pacientes SET nombre = ?, telefono = ?, edad = ?, genero = ?, direccion = ? WHERE dni = ?',
-      [nombre, telefono || null, edad, genero || null, direccion || null, dni]
-    );
-    if (!result.affectedRows) return NextResponse.json({ error: 'Paciente no encontrado' }, { status: 404 });
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        'UPDATE pacientes SET nombre = $1, telefono = $2, edad = $3, genero = $4, direccion = $5 WHERE dni = $6 RETURNING id',
+        [nombre, telefono || null, edad, genero || null, direccion || null, dni]
+      );
+      if (!result.rowCount) {
+        await client.query('ROLLBACK');
+        return NextResponse.json({ error: 'Paciente no encontrado' }, { status: 404 });
+      }
+      for (const tabla of ['triaje', 'pagos', 'citas', 'internamientos', 'recetas']) {
+        await client.query(`UPDATE ${tabla} SET nombre_paciente = $1 WHERE dni_paciente = $2`, [nombre, dni]);
+      }
+      await client.query('UPDATE citas SET telefono = $1 WHERE dni_paciente = $2', [telefono || null, dni]);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally { client.release(); }
     return NextResponse.json({ success: true, dni, nombre });
   } catch (error) {
     return databaseError(error);

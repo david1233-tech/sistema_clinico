@@ -2,8 +2,6 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
-import { extraerDatosTriaje } from '@/lib/ocr-triaje';
-import { reconocerTextoLocal } from '@/lib/ocr-navegador';
 
 interface Triaje {
   id: string | number;
@@ -182,6 +180,8 @@ function EnfermeriaContent() {
   const [saving, setSaving] = useState<boolean>(false);
   const [buscandoDni, setBuscandoDni] = useState<boolean>(false);
   const [filtro, setFiltro] = useState<string>('');
+  const [historialAbierto, setHistorialAbierto] = useState(false);
+  const [paginaHistorial, setPaginaHistorial] = useState(1);
   const [mostrarOpcionales, setMostrarOpcionales] = useState<boolean>(true);
   const [dniHistorial, setDniHistorial] = useState<string | null>(null);
   const [detalleTriaje, setDetalleTriaje] = useState<Triaje | null>(null);
@@ -198,10 +198,6 @@ function EnfermeriaContent() {
   const [pendientes, setPendientes] = useState<File[]>([]);
   const [avanceSubida, setAvanceSubida] = useState<{ completados: number; total: number } | null>(null);
   const camaraAdjuntoRef = useRef<HTMLInputElement | null>(null);
-  const camaraHistorialRef = useRef<HTMLInputElement | null>(null);
-  const [leyendoHistorial, setLeyendoHistorial] = useState(false);
-  const [mensajeLectura, setMensajeLectura] = useState('');
-  const [textoVisibleHistorial, setTextoVisibleHistorial] = useState('');
   const [zoomImagen, setZoomImagen] = useState(1);
   const distanciaDedosRef = useRef<{ distancia: number; zoom: number } | null>(null);
   const detalleRequestRef = useRef(0);
@@ -232,41 +228,6 @@ function EnfermeriaContent() {
       cargarDatosPacientePorDni(dniTarget);
     }
   }, [dniParam, pacientesRegistrados]);
-
-  const leerFotoHistorial = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const seleccion = e.target.files?.[0];
-    e.target.value = '';
-    if (!seleccion) return;
-    setLeyendoHistorial(true);
-    setMensajeLectura('Leyendo foto del historial...');
-    setTextoVisibleHistorial('');
-    try {
-      const archivo = await prepararFoto(seleccion, 2600);
-      const textoVisible = await reconocerTextoLocal(archivo, porcentaje => setMensajeLectura(`Reconociendo texto en este teléfono... ${porcentaje}%`));
-      const campos = extraerDatosTriaje(textoVisible);
-      setTextoVisibleHistorial(textoVisible);
-      if (form.dni_paciente && campos.dni_paciente && form.dni_paciente !== campos.dni_paciente) {
-        throw new Error('El DNI de la foto no coincide con el paciente seleccionado. Revise la foto antes de continuar.');
-      }
-      if (form.dni_paciente) {
-        delete campos.dni_paciente;
-        if (form.nombre_paciente) delete campos.nombre_paciente;
-      }
-      if (registroEditando || registroPendienteId) delete campos.dni_paciente;
-      const reconocidos = Object.keys(campos).length;
-      if (!reconocidos) {
-        setMensajeLectura(textoVisible ? 'Se encontró texto visible, pero no se pudo asociar a campos con seguridad. Revíselo abajo y complete los datos manualmente.' : 'No se distinguieron datos para completar el formulario. Puede intentar con otra foto o ingresar los datos manualmente.');
-        return;
-      }
-      setForm(prev => ({ ...prev, ...campos }));
-      setMensajeLectura(`${reconocidos} datos completados. Revise cada valor antes de guardar${textoVisible ? ' y consulte el texto adicional de la foto.' : '.'}`);
-    } catch (error) {
-      setMensajeLectura(error instanceof Error ? error.message : 'No se pudo leer la foto.');
-    } finally {
-      setLeyendoHistorial(false);
-    }
-  };
-
   const fetchTriajes = async () => {
     try {
       setLoading(true);
@@ -457,6 +418,7 @@ function EnfermeriaContent() {
 
     adjuntosRequestRef.current += 1;
     cerrarRegistros();
+    setHistorialAbierto(false);
     setRegistroEditando(null);
     setRegistroPendienteId(null);
     setForm(crearFormularioTriaje(
@@ -484,6 +446,7 @@ function EnfermeriaContent() {
     );
     if (hayDatosSinGuardar && !confirm('Los cambios que aún no guardó en el formulario se perderán. ¿Continuar?')) return;
     cerrarRegistros();
+    setHistorialAbierto(false);
     setRegistroEditando(registro);
     setRegistroPendienteId(null);
     setForm(formularioDesdeRegistro(registro));
@@ -610,6 +573,7 @@ function EnfermeriaContent() {
     registros[0].dni_paciente.includes(filtro)
   );
   const registrosPaciente = triajes.filter(t => t.dni_paciente === dniHistorial);
+  const totalPaginasHistorial = Math.max(1, Math.ceil(historialAgrupado.length / 12));
 
   return (
     <>
@@ -678,9 +642,10 @@ function EnfermeriaContent() {
             </span>
             <button
               type="button"
+              onClick={() => setHistorialAbierto(true)}
               className="text-xs text-teal-800 font-extrabold bg-teal-50 px-3 py-1.5 rounded-full border border-teal-200 shrink-0 cursor-pointer hover:bg-teal-100 transition-all"
             >
-              📋 Registro Clínico Previo
+              📋 Abrir historial de triajes
             </button>
           </header>
           <main className="p-4 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto w-full items-start">
@@ -695,16 +660,6 @@ function EnfermeriaContent() {
               </div>
               
               <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
-                <div className="bg-sky-50 p-3 rounded-xl border border-sky-200">
-                  <p className="m-0 text-[11px] font-extrabold text-sky-900 uppercase">📸 Leer historial con la cámara</p>
-                  <p className="text-xs text-sky-800 my-2">Tome una foto de la ficha clínica. El texto se lee en este teléfono, sin usar saldo de OpenAI. La primera lectura descarga el lector y puede tardar un poco.</p>
-                  <input ref={camaraHistorialRef} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={leerFotoHistorial} className="hidden" aria-label="Foto del historial" />
-                  <button type="button" onClick={() => camaraHistorialRef.current?.click()} disabled={saving || leyendoHistorial} className="px-3 py-2 bg-sky-800 text-white font-bold text-xs rounded-xl disabled:opacity-50 cursor-pointer">
-                    {leyendoHistorial ? 'Leyendo foto...' : '📸 Tomar foto del historial'}
-                  </button>
-                  {mensajeLectura && <p role="status" className="text-xs text-sky-900 mt-2 mb-0">{mensajeLectura}</p>}
-                  {textoVisibleHistorial && <details className="mt-2 text-xs text-sky-900"><summary className="cursor-pointer font-bold">Ver texto reconocido de la foto</summary><p className="whitespace-pre-wrap break-words mt-1 mb-0">{textoVisibleHistorial}</p></details>}
-                </div>
                 <div className="bg-teal-50 p-3 rounded-xl border border-teal-200">
                   <label className="block text-[11px] font-extrabold text-teal-900 mb-1 uppercase tracking-wider">
                     👤 SELECCIONAR PACIENTE REGISTRADO EN RECEPCIÓN
@@ -978,8 +933,9 @@ function EnfermeriaContent() {
               </form>
             </div>
 
-            {/* HISTORIAL DEBAJO DEL FORMULARIO */}
-            <div className="w-full bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            {/* Historial accesible desde el encabezado, con búsqueda y páginas. */}
+            {historialAbierto && <div className="fixed inset-0 z-30 bg-slate-950/70 p-3 md:p-8 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Historial de triajes">
+            <div className="w-full max-w-5xl max-h-[90vh] bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xl flex flex-col">
               <div className="bg-slate-900 p-4 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-base">📋</div>
@@ -992,12 +948,13 @@ function EnfermeriaContent() {
                   type="text"
                   placeholder="🔍 Buscar DNI o Nombre..."
                   value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
+                  onChange={(e) => { setFiltro(e.target.value); setPaginaHistorial(1); }}
                   className="w-full sm:w-56 p-2 rounded-xl border border-slate-700 bg-slate-800 text-white text-xs outline-none"
                 />
+                <button type="button" onClick={() => setHistorialAbierto(false)} className="text-white font-bold" aria-label="Cerrar historial">✕ Cerrar</button>
               </div>
               
-              <div className="p-4 flex flex-col gap-3.5 max-h-[750px] overflow-y-auto">
+              <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3.5 overflow-y-auto">
                 {loading ? (
                   <div className="p-8 text-center text-slate-500 text-xs">Cargando registros de triaje...</div>
                 ) : historialAgrupado.length === 0 ? (
@@ -1006,7 +963,7 @@ function EnfermeriaContent() {
                     <p className="m-0 text-slate-700 text-xs font-bold">No hay registros de triaje.</p>
                   </div>
                 ) : (
-                  historialAgrupado.map((registros, idx) => {
+                  historialAgrupado.slice((paginaHistorial - 1) * 12, paginaHistorial * 12).map((registros, idx) => {
                     const t = registros[0];
                     const isSelected = form.dni_paciente === t.dni_paciente;
                     return (
@@ -1089,7 +1046,13 @@ function EnfermeriaContent() {
                   })
                 )}
               </div>
+              {totalPaginasHistorial > 1 && <div className="flex items-center justify-center gap-3 border-t border-slate-200 p-3 text-xs font-bold text-slate-700">
+                <button type="button" onClick={() => setPaginaHistorial(prev => Math.max(1, prev - 1))} disabled={paginaHistorial === 1} className="rounded-lg border px-3 py-1.5 disabled:opacity-40">Anterior</button>
+                Página {paginaHistorial} de {totalPaginasHistorial}
+                <button type="button" onClick={() => setPaginaHistorial(prev => Math.min(totalPaginasHistorial, prev + 1))} disabled={paginaHistorial >= totalPaginasHistorial} className="rounded-lg border px-3 py-1.5 disabled:opacity-40">Siguiente</button>
+              </div>}
             </div>
+            </div>}
           </main>
         </div>
         {dniHistorial && (

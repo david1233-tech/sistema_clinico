@@ -9,8 +9,8 @@ function signature(payload: string, secret: string) {
   return createHmac('sha256', secret).update(payload).digest('base64url');
 }
 
-export function createSession(role: Role, secret: string) {
-  const payload = Buffer.from(JSON.stringify({ role, expires: Date.now() + 7 * 24 * 60 * 60 * 1000 })).toString('base64url');
+export function createSession(role: Role, secret: string, days = 7) {
+  const payload = Buffer.from(JSON.stringify({ role, expires: Date.now() + days * 24 * 60 * 60 * 1000 })).toString('base64url');
   return `${payload}.${signature(payload, secret)}`;
 }
 

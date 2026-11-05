@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import InstalarApp from '@/components/InstalarApp';
 
@@ -8,29 +8,39 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [error, setError] = useState('');
+  const [ingresando, setIngresando] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/login', { cache: 'no-store' }).then(response => response.json()).then(result => {
+      if (result.authenticated && result.next) window.location.replace(result.next);
+    }).catch(() => {});
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIngresando(true);
     try {
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuario, password }),
+        body: JSON.stringify({ usuario, password, mobile: /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) || Boolean((window as Window & { Capacitor?: unknown }).Capacitor) }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'No se pudo iniciar sesión');
       localStorage.setItem('auth_vital_salud', 'true');
       localStorage.setItem('user_role', result.role);
       localStorage.setItem('user_name', result.name);
-      window.location.assign(result.next);
+      await new Promise(resolve => setTimeout(resolve, 700));
+      window.location.replace(result.next);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'No se pudo iniciar sesión');
+      setIngresando(false);
     }
   };
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center p-4 sm:p-6 md:p-8 font-sans overflow-y-auto bg-slate-950">
+    <div className={`login-stage relative min-h-screen w-full flex items-center justify-center p-4 sm:p-6 md:p-8 font-sans overflow-y-auto bg-slate-950 ${ingresando ? 'login-stage-leaving' : ''}`}>
       
       {/* FONDO DE PANTALLA */}
       <div 
@@ -40,7 +50,7 @@ export default function LoginPage() {
       <div className="absolute inset-0 bg-black/20 z-0 backdrop-blur-[2px]" />
 
       {/* RECUADRO RESPONSIVE DE LOGIN */}
-      <div className="relative z-10 w-full max-w-4xl bg-white rounded-3xl sm:rounded-[36px] shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2 my-auto">
+      <div className="login-card relative z-10 w-full max-w-4xl bg-white rounded-3xl sm:rounded-[36px] shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2 my-auto">
         
         {/* LADO IZQUIERDO: ILUSTRACIÓN (Visible en PC y Tablets horizontales) */}
         <div className="hidden md:flex relative bg-purple-50 items-center justify-center p-8 overflow-hidden min-h-[480px]">
@@ -93,6 +103,8 @@ export default function LoginPage() {
                   value={usuario} 
                   onChange={(e) => setUsuario(e.target.value)} 
                   placeholder="Ingrese su usuario"
+                  autoComplete="username"
+                  name="username"
                   required
                   className="w-full pl-9 pr-3 py-2.5 sm:py-3 border-b-2 border-purple-600 text-sm font-semibold outline-none text-slate-900 bg-transparent transition-all focus:border-purple-800"
                 />
@@ -110,6 +122,8 @@ export default function LoginPage() {
                   value={password} 
                   onChange={(e) => setPassword(e.target.value)} 
                   placeholder="••••••••"
+                  autoComplete="current-password"
+                  name="password"
                   required
                   className="w-full pl-9 pr-11 py-2.5 sm:py-3 border-b-2 border-slate-300 text-sm font-semibold outline-none text-slate-900 bg-transparent transition-all focus:border-purple-600"
                 />
@@ -127,9 +141,10 @@ export default function LoginPage() {
 
             <button 
               type="submit" 
+              disabled={ingresando}
               className="mt-3 sm:mt-4 py-3 sm:py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-full font-extrabold text-sm sm:text-base cursor-pointer shadow-lg shadow-purple-500/30 transition-all active:scale-[0.98]"
             >
-              Iniciar Sesión
+              {ingresando ? 'Ingresando a Vital Salud…' : 'Iniciar Sesión'}
             </button>
           </form>
 

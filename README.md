@@ -30,9 +30,11 @@ Para la consulta automática de DNI, configura también `RENIEC_API_URL` (URL HT
 
 La URL HTTPS de Vercel se puede instalar como aplicación web desde el navegador del móvil. La información clínica requiere internet y se comparte mediante la misma base Supabase.
 
-## Lectura de fotos del historial en enfermería
+## Historial y adjuntos
 
-El formulario de triaje puede completar datos desde una foto con OCR en el navegador mediante Tesseract.js. No requiere clave ni saldo de OpenAI y la foto no se envía al servicio de OpenAI. La primera lectura descarga el motor OCR y el idioma español desde una CDN, por lo que necesita conexión a internet. El texto reconocido se muestra para revisión; los datos extraídos pueden tener errores, especialmente con letra manuscrita o imágenes borrosas, y deben corregirse antes de guardar. La foto no se guarda como adjunto automáticamente.
+El historial de triajes se abre desde el encabezado de Enfermería y muestra pacientes en páginas de 12 tarjetas con búsqueda por nombre o DNI. Los triajes y tratamientos de vitaminas permiten adjuntar hasta 200 imágenes o PDF de 3 MB cada uno por registro. La tabla de adjuntos de vitaminas se crea al usar el módulo; para prepararla manualmente ejecute `database/migrate-vitaminas-adjuntos.sql`.
+
+En dispositivos móviles, el inicio de sesión conserva una sesión segura durante 90 días para no volver a introducir las credenciales al abrir la aplicación. La contraseña no se almacena en el navegador.
 
 ## Desarrollo local
 

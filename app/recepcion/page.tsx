@@ -184,6 +184,14 @@ function RecepcionPageContent() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo actualizar el paciente');
+      const activo = localStorage.getItem('paciente_activo_vital_salud');
+      if (activo) {
+        try {
+          const seleccionado = JSON.parse(activo);
+          if (seleccionado.dni === edicionPaciente.dni) localStorage.setItem('paciente_activo_vital_salud', JSON.stringify({ ...seleccionado, nombre: edicionPaciente.nombre }));
+        } catch { /* Se actualizará desde la base de datos en la siguiente carga. */ }
+      }
+      window.dispatchEvent(new Event('paciente_activo_changed'));
       setEdicionPaciente(null);
       await fetchDatosRecepcion();
     } catch (error) {

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
+import { Activity, ArrowUpRight, CalendarDays, CircleDollarSign, UsersRound } from 'lucide-react';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({
@@ -12,19 +13,15 @@ export default function DashboardPage() {
 
   const [ultimosTriajes, setUltimosTriajes] = useState<any[]>([]);
   const [ultimosCobros, setUltimosCobros] = useState<any[]>([]);
+  const [totalCobros, setTotalCobros] = useState(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [tabActiva, setTabActiva] = useState<'ventas' | 'vitaminas' | 'hospedaje'>('ventas');
 
   const [pacientesVitaminas, setPacientesVitaminas] = useState<any[]>([]);
   const [pacientesHospedaje, setPacientesHospedaje] = useState<any[]>([]);
 
-  const [datosMensualesVentas, setDatosMensualesVentas] = useState<{ [mes: string]: number }>({
-    'Ago': 0,
-    'Sep': 0,
-    'Oct': 0,
-    'Nov': 0,
-    'Dic': 0
-  });
+  const [datosMensualesVentas, setDatosMensualesVentas] = useState<{ [mes: string]: number }>({});
+  const [fechaActualizacion, setFechaActualizacion] = useState('');
 
   useEffect(() => {
     cargarDatosLocales();
@@ -42,50 +39,56 @@ export default function DashboardPage() {
 
   const cargarDatosLocales = async () => {
     try {
-      const [pacientesResponse, triajesResponse, cajaResponse] = await Promise.all([
+      const [pacientesResponse, triajesResponse, cajaResponse, vitaminasResponse, internadosResponse] = await Promise.all([
         fetch('/api/pacientes', { cache: 'no-store' }),
         fetch('/api/triaje', { cache: 'no-store' }),
         fetch('/api/caja', { cache: 'no-store' }),
+        fetch('/api/vitaminas', { cache: 'no-store' }),
+        fetch('/api/internados', { cache: 'no-store' }),
       ]);
-      if (!pacientesResponse.ok || !triajesResponse.ok || !cajaResponse.ok) {
+      if (!pacientesResponse.ok || !triajesResponse.ok || !cajaResponse.ok || !vitaminasResponse.ok || !internadosResponse.ok) {
         throw new Error('No se pudieron cargar los datos del dashboard');
       }
       const pacientes: any[] = await pacientesResponse.json();
       const triajes: any[] = await triajesResponse.json();
       const caja = await cajaResponse.json();
       const cobros: any[] = caja.pagos || [];
+      setTotalCobros(cobros.length);
+      const vitaminas: any[] = await vitaminasResponse.json();
+      const internados: any[] = await internadosResponse.json();
 
       const totalPacientes = pacientes.length > 0 ? pacientes.length : new Set(triajes.map(t => t.dni_paciente)).size;
       const totalRecaudadoNum = cobros.reduce((acc, curr) => acc + (Number(curr.monto) || 0), 0);
+      const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      const fechaLima = (valor: string) => {
+        const parsed = new Date(valor);
+        return Number.isNaN(parsed.getTime()) ? '' : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(parsed);
+      };
 
       setStats({
         totalPacientes,
-        triajesHoy: triajes.length,
+        triajesHoy: triajes.filter(t => fechaLima(t.fecha || t.fecha_hora) === hoy).length,
         ingresosHoy: `S/ ${totalRecaudadoNum.toFixed(2)}`
       });
 
-      const filtradosVit = cobros.filter(c => 
-        (c.concepto || '').toLowerCase().includes('vitamina') || 
-        (c.concepto || '').toLowerCase().includes('suero') ||
-        (c.concepto || '').toLowerCase().includes('nutricional')
-      );
+      setPacientesVitaminas(vitaminas);
+      setPacientesHospedaje(internados);
 
-      const filtradosHosp = cobros.filter(c => 
-        (c.concepto || '').toLowerCase().includes('internado') || 
-        (c.concepto || '').toLowerCase().includes('hospedaje') ||
-        (c.concepto || '').toLowerCase().includes('especializado')
-      );
-
-      setPacientesVitaminas(filtradosVit);
-      setPacientesHospedaje(filtradosHosp);
-
-      setDatosMensualesVentas({
-        'Ago': 0,
-        'Sep': 0,
-        'Oct': totalRecaudadoNum,
-        'Nov': 0,
-        'Dic': 0
+      const meses: { [mes: string]: number } = {};
+      for (let i = 4; i >= 0; i--) {
+        const fecha = new Date();
+        fecha.setDate(1);
+        fecha.setMonth(fecha.getMonth() - i);
+        meses[fecha.toLocaleDateString('es-PE', { month: 'short', year: '2-digit' })] = 0;
+      }
+      cobros.forEach(c => {
+        const fecha = new Date(c.fecha);
+        if (Number.isNaN(fecha.getTime())) return;
+        const mes = fecha.toLocaleDateString('es-PE', { month: 'short', year: '2-digit', timeZone: 'America/Lima' });
+        if (mes in meses) meses[mes] += Number(c.monto) || 0;
       });
+      setDatosMensualesVentas(meses);
+      setFechaActualizacion(new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }));
 
       setUltimosTriajes(triajes.slice(0, 5));
       setUltimosCobros(cobros.slice(0, 5));
@@ -99,16 +102,16 @@ export default function DashboardPage() {
   const maxBarraVentas = Math.max(...Object.values(datosMensualesVentas), 100);
 
   return (
-    <div className="flex min-h-screen bg-slate-100 font-sans text-slate-900 overflow-x-hidden">
+    <div className="dashboard-shell flex min-h-screen bg-[#f3f7f8] font-sans text-slate-900 overflow-x-hidden">
       
       <Sidebar />
 
       <div className="flex-1 flex flex-col min-w-0 md:ml-64 transition-all">
         
         {/* HEADER SUPERIOR */}
-        <header className="h-16 md:h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8 sticky top-0 z-20 shadow-sm">
-          <span className="text-xs md:text-sm text-slate-500 font-medium truncate">
-            Panel / <strong className="text-slate-900">Dashboard General de Control</strong>
+        <header className="h-16 md:h-20 bg-white/90 backdrop-blur-xl border-b border-slate-200 flex items-center justify-between px-4 md:px-8 sticky top-0 z-20">
+          <span className="text-xs md:text-sm text-slate-500 font-medium truncate pl-12 md:pl-0">
+            Vital Salud / <strong className="text-slate-900">Panel de control</strong>
           </span>
           <div className="flex items-center gap-2">
             <span className="text-[11px] md:text-xs text-emerald-700 font-extrabold bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 shrink-0 flex items-center gap-1.5">
@@ -121,26 +124,29 @@ export default function DashboardPage() {
         {/* CONTENIDO PRINCIPAL */}
         <main className="p-4 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto w-full">
           
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="dashboard-hero relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#102e43] via-[#0f5360] to-[#087b75] p-6 md:p-9 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5 shadow-[0_24px_60px_rgba(10,53,68,0.18)]">
+            <div className="dashboard-orb absolute -right-12 -top-20 h-64 w-64 rounded-full border-[42px] border-white/10 pointer-events-none" />
             <div>
-              <h1 className="m-0 text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
-                📊 Dashboard General de Control
+              <p className="m-0 text-[11px] font-bold tracking-[0.22em] uppercase text-teal-200">Centro de operaciones</p>
+              <h1 className="m-0 mt-2 text-2xl md:text-4xl font-black text-white tracking-tight">
+                Panel de control
               </h1>
-              <p className="m-0 text-xs md:text-sm text-slate-500 mt-1">
-                Resumen ejecutivo en tiempo real del flujo de atención, finanzas y pacientes de la clínica.
+              <p className="m-0 text-xs md:text-sm text-slate-100/85 mt-2 max-w-xl">
+                Actividad clínica y financiera en un solo lugar. {fechaActualizacion && `Actualizado a las ${fechaActualizacion}.`}
               </p>
             </div>
             <Link
               href="/recepcion"
-              className="w-full sm:w-auto px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-black text-xs md:text-sm cursor-pointer shadow-md transition-all flex items-center justify-center gap-2 no-underline shrink-0"
+              className="relative w-full sm:w-auto px-5 py-3 bg-white hover:bg-teal-50 text-[#0e5660] rounded-xl font-black text-xs md:text-sm cursor-pointer shadow-lg transition-all flex items-center justify-center gap-2 no-underline shrink-0 hover:-translate-y-1"
             >
-              <span>+</span> Nueva Recepción
+              <span>＋</span> Nueva recepción <ArrowUpRight size={16} />
             </Link>
           </div>
 
           {/* TARJETAS KPI */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+            <div className="dashboard-reveal dashboard-kpi bg-white rounded-2xl p-5 border border-slate-200 shadow-sm" style={{ animationDelay: '80ms' }}>
+              <UsersRound className="text-[#087b75]" size={23} />
               <span className="text-[11px] font-extrabold text-teal-700 uppercase tracking-wider block">
                 TOTAL PACIENTES
               </span>
@@ -149,16 +155,18 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+            <div className="dashboard-reveal dashboard-kpi bg-white rounded-2xl p-5 border border-slate-200 shadow-sm" style={{ animationDelay: '160ms' }}>
+              <Activity className="text-[#087b75]" size={23} />
               <span className="text-[11px] font-extrabold text-teal-700 uppercase tracking-wider block">
-                TRIAJES REGISTRADOS
+                TRIAJES DE HOY
               </span>
               <div className="text-2xl md:text-3xl font-black text-teal-700 mt-2">
                 {loading ? '...' : stats.triajesHoy}
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+            <div className="dashboard-reveal dashboard-kpi bg-white rounded-2xl p-5 border border-slate-200 shadow-sm" style={{ animationDelay: '240ms' }}>
+              <CircleDollarSign className="text-[#087b75]" size={23} />
               <span className="text-[11px] font-extrabold text-teal-700 uppercase tracking-wider block">
                 INGRESOS TOTALES
               </span>
@@ -169,7 +177,7 @@ export default function DashboardPage() {
           </div>
 
           {/* SECCIÓN PESTAÑAS */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div className="dashboard-reveal bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm" style={{ animationDelay: '320ms' }}>
             <div className="flex flex-col sm:flex-row border-b border-slate-200 bg-slate-50">
               <button
                 type="button"
@@ -228,14 +236,14 @@ export default function DashboardPage() {
                         {stats.ingresosHoy}
                       </div>
                       <span className="text-[11px] text-slate-400">
-                        {ultimosCobros.length} transacciones registradas
+                        {totalCobros} transacciones registradas
                       </span>
                     </div>
                   </div>
 
                   <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
                     <h4 className="m-0 text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-4">
-                      📊 Comparativa de Pagos por Mes (Soles)
+                      <CalendarDays size={15} className="inline mr-1" /> Ingresos de los últimos cinco meses (Soles)
                     </h4>
                     <div className="h-44 flex items-end justify-between gap-2 sm:gap-6 pt-6 px-2 border-b border-slate-200">
                       {Object.entries(datosMensualesVentas).map(([mes, valor]) => {
@@ -245,7 +253,7 @@ export default function DashboardPage() {
                             <span className="text-[10px] font-black text-slate-600">S/ {valor}</span>
                             <div 
                               style={{ height: valor > 0 ? `${alturaPorcentaje}%` : '8px' }}
-                              className={`w-full rounded-t-lg transition-all duration-500 ${
+                              className={`dashboard-bar w-full rounded-t-lg transition-all duration-700 ${
                                 valor > 0 ? 'bg-teal-600 shadow-md' : 'bg-slate-200'
                               }`}
                             ></div>
@@ -275,7 +283,7 @@ export default function DashboardPage() {
                         TOTAL PACIENTES ATENDIDOS
                       </span>
                       <div className="text-xl md:text-2xl font-black text-indigo-600 truncate">
-                        {pacientesVitaminas.length} Pacientes
+                        {new Set(pacientesVitaminas.map(p => p.dni_paciente)).size} pacientes
                       </div>
                     </div>
                   </div>
@@ -292,7 +300,7 @@ export default function DashboardPage() {
                           <div key={p.id || idx} className="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
                             <div>
                               <strong className="text-slate-900 uppercase block">{p.nombre_paciente}</strong>
-                              <span className="text-slate-500">DNI: {p.dni_paciente} • Concepto: {p.concepto}</span>
+                              <span className="text-slate-500">DNI: {p.dni_paciente} • {p.vitaminaNombre}</span>
                             </div>
                             <span className="text-[11px] font-extrabold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg">
                               Aplicado
@@ -322,7 +330,7 @@ export default function DashboardPage() {
                         TOTAL PACIENTES INTERNADOS
                       </span>
                       <div className="text-xl md:text-2xl font-black text-teal-700 truncate">
-                        {pacientesHospedaje.length} Pacientes
+                        {new Set(pacientesHospedaje.map(p => p.dni_paciente)).size} pacientes
                       </div>
                     </div>
                   </div>
@@ -339,10 +347,10 @@ export default function DashboardPage() {
                           <div key={p.id || idx} className="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
                             <div>
                               <strong className="text-slate-900 uppercase block">{p.nombre_paciente}</strong>
-                              <span className="text-slate-500">DNI: {p.dni_paciente} • Detalle: {p.concepto}</span>
+                              <span className="text-slate-500">DNI: {p.dni_paciente} • Cama: {p.cama}</span>
                             </div>
                             <span className="text-[11px] font-extrabold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-lg">
-                              Internado
+                              {p.estado || 'Registrado'}
                             </span>
                           </div>
                         ))}
@@ -448,4 +456,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

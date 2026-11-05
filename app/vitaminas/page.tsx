@@ -27,6 +27,10 @@ interface Tratamiento {
   activo: boolean;
 }
 
+interface AdjuntoVitamina { id: number; nombre: string; tipo: string; fecha: string }
+const MAX_ADJUNTOS_VITAMINA = 200;
+const TIPOS_ADJUNTOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+
 interface VitaminaAdicional {
   id: number;
   vitaminaNombre: string;
@@ -174,6 +178,10 @@ function VitaminasPageContent() {
   const [registroEditando, setRegistroEditando] = useState<Tratamiento | null>(null);
   const [vitaminasAdicionales, setVitaminasAdicionales] = useState<VitaminaAdicional[]>([]);
   const siguienteAdicionalId = useRef(0);
+  const [tratamientoAdjuntos, setTratamientoAdjuntos] = useState<Tratamiento | null>(null);
+  const [adjuntos, setAdjuntos] = useState<AdjuntoVitamina[]>([]);
+  const [subiendoAdjuntos, setSubiendoAdjuntos] = useState(false);
+  const [avanceAdjuntos, setAvanceAdjuntos] = useState('');
   
   const [formVitamina, setFormVitamina] = useState({
     vitaminaNombre: '',
@@ -311,16 +319,17 @@ function VitaminasPageContent() {
   };
 
   const handleAgregarVitamina = () => {
-    if (vitaminasAdicionales.length >= 49) return;
-    siguienteAdicionalId.current += 1;
-    setVitaminasAdicionales(prev => [...prev, {
-      id: siguienteAdicionalId.current,
-      vitaminaNombre: '', dosis: '', via: '', viaOpcion: '', observaciones: ''
-    }]);
-  };
-
-  const actualizarVitaminaAdicional = (id: number, cambio: Partial<VitaminaAdicional>) => {
-    setVitaminasAdicionales(prev => prev.map(item => item.id === id ? { ...item, ...cambio } : item));
+    if (!busquedaVitamina.trim() || vitaminasAdicionales.length >= 49) return;
+    if (!formVitamina.vitaminaNombre || registroEditando) setFormVitamina(prev => ({ ...prev, vitaminaNombre: busquedaVitamina.trim() }));
+    else {
+      siguienteAdicionalId.current += 1;
+      setVitaminasAdicionales(prev => [...prev, {
+        id: siguienteAdicionalId.current,
+        vitaminaNombre: busquedaVitamina.trim(), dosis: '', via: '', viaOpcion: '', observaciones: ''
+      }]);
+    }
+    setBusquedaVitamina('');
+    setMostrarCatalogo(false);
   };
 
   const handleEditarTratamiento = (tratamiento: Tratamiento) => {
@@ -348,7 +357,7 @@ function VitaminasPageContent() {
   const handleGuardarVitamina = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pacienteSeleccionado) return;
-    const aplicaciones = [formVitamina, ...vitaminasAdicionales.map(({ vitaminaNombre, dosis, via, observaciones }) => ({ vitaminaNombre, dosis, via, observaciones }))]
+    const aplicaciones = [formVitamina, ...vitaminasAdicionales.map(({ vitaminaNombre }) => ({ ...formVitamina, vitaminaNombre }))]
       .map(item => ({
         vitaminaNombre: item.vitaminaNombre.trim(),
         dosis: item.dosis.trim(),
@@ -413,6 +422,48 @@ function VitaminasPageContent() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const abrirAdjuntos = async (tratamiento: Tratamiento) => {
+    setTratamientoAdjuntos(tratamiento);
+    setAdjuntos([]);
+    setAvanceAdjuntos('Cargando archivos...');
+    try {
+      const response = await fetch(`/api/vitaminas/adjuntos?id=${tratamiento.id}`);
+      if (!response.ok) throw new Error('No se pudieron cargar los archivos');
+      setAdjuntos(await response.json());
+      setAvanceAdjuntos('');
+    } catch (error) { setAvanceAdjuntos(error instanceof Error ? error.message : 'Error al cargar archivos'); }
+  };
+
+  const subirAdjuntos = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const archivos = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!tratamientoAdjuntos || !archivos.length) return;
+    if (adjuntos.length + archivos.length > MAX_ADJUNTOS_VITAMINA) return alert('Se permiten hasta 200 archivos por tratamiento.');
+    if (archivos.some(file => !TIPOS_ADJUNTOS.includes(file.type) || !file.size || file.size > 3 * 1024 * 1024)) return alert('Solo imágenes JPG, PNG, WebP, GIF o PDF de hasta 3 MB por archivo.');
+    setSubiendoAdjuntos(true);
+    try {
+      for (let i = 0; i < archivos.length; i++) {
+        setAvanceAdjuntos(`Subiendo ${i + 1} de ${archivos.length}...`);
+        const form = new FormData();
+        form.append('receta_id', String(tratamientoAdjuntos.id));
+        form.append('archivo', archivos[i]);
+        const response = await fetch('/api/vitaminas/adjuntos', { method: 'POST', body: form });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || `No se pudo subir ${archivos[i].name}`);
+        setAdjuntos(prev => [...prev, result]);
+      }
+      setAvanceAdjuntos(`${archivos.length} archivo(s) guardado(s).`);
+    } catch (error) { setAvanceAdjuntos(error instanceof Error ? error.message : 'No se pudo subir el archivo'); }
+    finally { setSubiendoAdjuntos(false); }
+  };
+
+  const eliminarAdjunto = async (id: number) => {
+    if (!confirm('¿Eliminar este archivo?')) return;
+    const response = await fetch(`/api/vitaminas/adjuntos?id=${id}`, { method: 'DELETE' });
+    if (response.ok) setAdjuntos(prev => prev.filter(item => item.id !== id));
+    else alert('No se pudo eliminar el archivo.');
   };
 
   const handleDesmarcarVitamina = async () => {
@@ -651,7 +702,7 @@ function VitaminasPageContent() {
                       </div>
                       <div className="relative">
                         <label htmlFor="buscar-vitamina" className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
-                          BUSCAR VITAMINA O SUERO
+                          BUSCAR Y AÑADIR VITAMINAS O SUEROS
                         </label>
                         <input
                           id="buscar-vitamina"
@@ -674,8 +725,12 @@ function VitaminasPageContent() {
                                 key={nombre}
                                 type="button"
                                 onClick={() => {
-                                  setFormVitamina(prev => ({ ...prev, vitaminaNombre: nombre }));
-                                  setBusquedaVitamina(nombre);
+                                  if (!formVitamina.vitaminaNombre || registroEditando) setFormVitamina(prev => ({ ...prev, vitaminaNombre: nombre }));
+                                  else {
+                                    siguienteAdicionalId.current += 1;
+                                    setVitaminasAdicionales(prev => prev.length >= 49 ? prev : [...prev, { id: siguienteAdicionalId.current, vitaminaNombre: nombre, dosis: '', via: '', viaOpcion: '', observaciones: '' }]);
+                                  }
+                                  setBusquedaVitamina('');
                                   setMostrarCatalogo(false);
                                 }}
                                 className="block w-full px-3 py-2 text-left text-xs md:text-sm font-semibold text-slate-800 hover:bg-teal-50 cursor-pointer"
@@ -685,6 +740,11 @@ function VitaminasPageContent() {
                             )) : <p className="m-0 p-3 text-xs text-slate-500">No se encontraron opciones. Puede escribir el nombre manualmente.</p>}
                           </div>
                         )}
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {vitaminasAdicionales.map(item => <span key={item.id} className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200 px-3 py-1 text-xs font-bold text-teal-900">{item.vitaminaNombre}<button type="button" onClick={() => setVitaminasAdicionales(prev => prev.filter(v => v.id !== item.id))} aria-label={`Quitar ${item.vitaminaNombre}`} className="text-rose-700">✕</button></span>)}
+                        </div>
+                        {vitaminasAdicionales.length > 0 && <p className="text-[11px] text-teal-800 m-0 mt-1">Todas las vitaminas elegidas usarán la dosis, vía y observaciones de este formulario.</p>}
+                        <button type="button" onClick={handleAgregarVitamina} disabled={!busquedaVitamina.trim() || vitaminasAdicionales.length >= 49} className="mt-2 text-xs font-bold text-teal-700 disabled:opacity-40">＋ Agregar lo escrito</button>
                       </div>
                       <div>
                         <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
@@ -745,62 +805,6 @@ function VitaminasPageContent() {
                         className="w-full p-3 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600 focus:bg-white resize-y"
                       />
                     </div>
-                    {!registroEditando && (
-                      <div className="rounded-2xl border border-teal-200 bg-teal-50/70 p-4 space-y-4">
-                        <div>
-                          <h4 className="m-0 text-sm font-extrabold text-teal-900">Vitaminas o sueros de esta misma cita</h4>
-                          <p className="m-0 mt-1 text-xs text-teal-800">Puede agregar varias aplicaciones. Cada una tendrá su propia dosis, vía y observaciones.</p>
-                        </div>
-                        {vitaminasAdicionales.map((item, indice) => (
-                          <div key={item.id} className="rounded-xl border border-sky-200 bg-white p-4 space-y-3 shadow-sm">
-                            <div className="flex items-center justify-between gap-3">
-                              <strong className="text-xs text-sky-900">Vitamina o suero adicional {indice + 2}</strong>
-                              <button type="button" onClick={() => setVitaminasAdicionales(prev => prev.filter(v => v.id !== item.id))} disabled={saving} className="text-xs font-bold text-rose-700 hover:text-rose-900 cursor-pointer">Quitar</button>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <label className="block text-[11px] font-bold text-slate-700">
-                                Nombre / tipo *
-                                <input type="text" list="catalogo-vitaminas-adicionales" value={item.vitaminaNombre} onChange={e => actualizarVitaminaAdicional(item.id, { vitaminaNombre: e.target.value })} placeholder="Escriba para buscar o elegir..." required className="mt-1 w-full p-2.5 rounded-xl border border-sky-200 bg-sky-50/40 text-slate-900 text-xs font-semibold outline-none focus:border-teal-600" />
-                              </label>
-                              <label className="block text-[11px] font-bold text-slate-700">
-                                Dosis / cantidad *
-                                <input type="text" value={item.dosis} onChange={e => actualizarVitaminaAdicional(item.id, { dosis: e.target.value })} placeholder="Ej: 1 ampolla" required className="mt-1 w-full p-2.5 rounded-xl border border-sky-200 bg-sky-50/40 text-slate-900 text-xs font-semibold outline-none focus:border-teal-600" />
-                              </label>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <label className="block text-[11px] font-bold text-slate-700">
-                                Vía de administración *
-                                <select value={item.viaOpcion} onChange={e => {
-                                  const opcion = e.target.value;
-                                  actualizarVitaminaAdicional(item.id, { viaOpcion: opcion, via: opcion === 'Otra' ? '' : opcion });
-                                }} required className="mt-1 w-full p-2.5 rounded-xl border border-sky-200 bg-white text-slate-900 text-xs font-semibold outline-none focus:border-teal-600">
-                                  <option value="">Seleccionar vía...</option>
-                                  <option value="Endovenosa">Endovenosa</option>
-                                  <option value="Intramuscular">Intramuscular</option>
-                                  <option value="Otra">Otra (escribir)</option>
-                                </select>
-                              </label>
-                              {item.viaOpcion === 'Otra' && (
-                                <label className="block text-[11px] font-bold text-slate-700">
-                                  Especifique la vía *
-                                  <input type="text" value={item.via} onChange={e => actualizarVitaminaAdicional(item.id, { via: e.target.value })} required className="mt-1 w-full p-2.5 rounded-xl border border-sky-200 bg-white text-slate-900 text-xs font-semibold outline-none focus:border-teal-600" />
-                                </label>
-                              )}
-                            </div>
-                            <label className="block text-[11px] font-bold text-slate-700">
-                              Observaciones
-                              <textarea rows={2} value={item.observaciones} onChange={e => actualizarVitaminaAdicional(item.id, { observaciones: e.target.value })} placeholder="Detalles de esta aplicación..." className="mt-1 w-full p-2.5 rounded-xl border border-sky-200 bg-white text-slate-900 text-xs font-semibold outline-none focus:border-teal-600 resize-y" />
-                            </label>
-                          </div>
-                        ))}
-                        <datalist id="catalogo-vitaminas-adicionales">
-                          {CATALOGO_VITAMINAS.map(nombre => <option key={nombre} value={nombre} />)}
-                        </datalist>
-                        <button type="button" onClick={handleAgregarVitamina} disabled={saving || vitaminasAdicionales.length >= 49} className="w-full rounded-xl border border-dashed border-teal-500 bg-white px-4 py-2.5 text-xs font-extrabold text-teal-800 hover:bg-teal-100 cursor-pointer disabled:opacity-50">
-                          ＋ Agregar otra vitamina o suero
-                        </button>
-                      </div>
-                    )}
                     <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
                       <button
                         type="button"
@@ -841,6 +845,7 @@ function VitaminasPageContent() {
                             <p className="m-0 mt-1 whitespace-pre-wrap"><strong>Observaciones:</strong> {t.observaciones || 'Sin observaciones'}</p>
                             <div className="flex flex-wrap gap-2 mt-3">
                               <button type="button" onClick={() => handleEditarTratamiento(t)} disabled={saving} className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50">✏️ Editar</button>
+                              <button type="button" onClick={() => abrirAdjuntos(t)} className="bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer">📁 Fotos y archivos</button>
                               <button type="button" onClick={() => handleEliminarTratamiento(t)} disabled={saving} className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50">🗑️ Eliminar</button>
                             </div>
                           </div>
@@ -854,6 +859,29 @@ function VitaminasPageContent() {
                   <span className="text-4xl block mb-2">🧪</span>
                   <h3 className="text-slate-900 font-extrabold text-base md:text-lg mb-1">Selecciona un paciente</h3>
                   <p className="text-slate-500 text-xs md:text-sm m-0">Elige a un usuario de la lista izquierda para administrar sus vitaminas.</p>
+                </div>
+              )}
+              {tratamientoAdjuntos && (
+                <div className="fixed inset-0 z-50 bg-slate-950/70 p-4 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Archivos del tratamiento" onClick={() => !subiendoAdjuntos && setTratamientoAdjuntos(null)}>
+                  <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div><h3 className="m-0 text-lg font-extrabold text-teal-900">Fotos y archivos</h3><p className="text-xs text-slate-600">{tratamientoAdjuntos.vitaminaNombre} · {adjuntos.length}/200 archivos</p></div>
+                      <button type="button" onClick={() => setTratamientoAdjuntos(null)} disabled={subiendoAdjuntos} aria-label="Cerrar archivos" className="text-slate-600 font-bold disabled:opacity-50">✕</button>
+                    </div>
+                    <label className="block mt-3 rounded-xl border-2 border-dashed border-teal-300 bg-teal-50 p-4 text-center text-sm font-bold text-teal-900 cursor-pointer">＋ Agregar imágenes o PDF
+                      <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={subirAdjuntos} disabled={subiendoAdjuntos || adjuntos.length >= MAX_ADJUNTOS_VITAMINA} className="sr-only" />
+                    </label>
+                    <p className="text-xs text-slate-500">Hasta 200 archivos de 3 MB cada uno por tratamiento.</p>
+                    {avanceAdjuntos && <p role="status" className="text-xs font-bold text-teal-800">{avanceAdjuntos}</p>}
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      {adjuntos.map(item => <div key={item.id} className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs min-w-0">
+                        <span aria-hidden="true">{item.tipo === 'application/pdf' ? '📄' : '🖼️'}</span>
+                        <span className="min-w-0 flex-1 truncate" title={item.nombre}>{item.nombre}</span>
+                        <a href={`/api/vitaminas/adjuntos/${item.id}`} target="_blank" rel="noopener noreferrer" className="font-bold text-teal-800">Abrir</a>
+                        <button type="button" onClick={() => eliminarAdjunto(item.id)} disabled={subiendoAdjuntos} className="font-bold text-rose-700">Eliminar</button>
+                      </div>)}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

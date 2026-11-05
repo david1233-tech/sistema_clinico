@@ -164,4 +164,19 @@ html[data-intro-seen] .intro {
     }
   }
 }
-
+@media (prefers-reduced-motion: no-preference) {
+  .login-card { animation: login-appear 700ms cubic-bezier(.2,.8,.2,1) both; }
+  .login-stage-leaving .login-card { animation: login-leave 650ms cubic-bezier(.4,0,.8,.2) both; }
+  .dashboard-hero { animation: dashboard-hero-in 850ms cubic-bezier(.2,.8,.2,1) both; }
+  .dashboard-reveal { animation: dashboard-reveal 800ms cubic-bezier(.2,.8,.2,1) both; }
+  .dashboard-orb { animation: dashboard-float 7s ease-in-out infinite alternate; }
+  .dashboard-kpi { transition: transform 250ms ease, box-shadow 250ms ease; }
+  .dashboard-kpi:hover { transform: translateY(-5px); box-shadow: 0 18px 35px rgba(17, 65, 77, .12); }
+  .dashboard-bar { transform-origin: bottom; animation: dashboard-grow 900ms cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes login-appear { from { opacity: 0; transform: translateY(24px) scale(.97); filter: blur(6px); } }
+  @keyframes login-leave { to { opacity: 0; transform: translateY(-18px) scale(1.03); filter: blur(10px); } }
+  @keyframes dashboard-hero-in { from { opacity: 0; transform: translateY(24px) scale(.98); } }
+  @keyframes dashboard-reveal { from { opacity: 0; transform: translateY(18px); } }
+  @keyframes dashboard-float { to { transform: translate(-18px, 16px) rotate(10deg); } }
+  @keyframes dashboard-grow { from { transform: scaleY(.05); opacity: .3; } }
+}
