@@ -240,7 +240,7 @@ function RecepcionPageContent() {
   });
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="module-shell flex min-h-screen bg-slate-50 font-sans text-slate-900">
       {/* ESTILOS CSS DINÁMICOS SEGÚN EL TIPO DE IMPRESIÓN */}
       <style jsx global>{`
         @media print {
@@ -288,7 +288,7 @@ function RecepcionPageContent() {
         <Sidebar />
       </div>
 
-      <div className="flex-1 flex flex-col w-full min-w-0 lg:ml-[270px] transition-all">
+      <div className="module-content flex-1 flex flex-col w-full min-w-0 lg:ml-[270px] transition-all">
         
         {/* HEADER SUPERIOR */}
         <header className="h-auto min-h-[70px] py-3 bg-white border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 sm:px-8 sticky top-0 z-20 gap-3 shadow-sm no-print">

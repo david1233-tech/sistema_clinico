@@ -102,11 +102,11 @@ export default function DashboardPage() {
   const maxBarraVentas = Math.max(...Object.values(datosMensualesVentas), 100);
 
   return (
-    <div className="dashboard-shell flex min-h-screen bg-[#f3f7f8] font-sans text-slate-900 overflow-x-hidden">
+    <div className="module-shell dashboard-shell flex min-h-screen bg-[#f3f7f8] font-sans text-slate-900 overflow-x-hidden">
       
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0 md:ml-64 transition-all">
+      <div className="module-content flex-1 flex flex-col min-w-0 md:ml-64 transition-all">
         
         {/* HEADER SUPERIOR */}
         <header className="h-16 md:h-20 bg-white/90 backdrop-blur-xl border-b border-slate-200 flex items-center justify-between px-4 md:px-8 sticky top-0 z-20">

@@ -57,10 +57,10 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
+    <div className="module-shell" style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
       <Sidebar />
       
-      <div style={{ marginLeft: '270px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div className="module-content" style={{ marginLeft: '270px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         
         {/* Header Superior */}
         <header style={{ height: '76px', backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', position: 'sticky', top: 0, zIndex: 10 }}>
@@ -100,7 +100,7 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Tarjetas KPI Superiores */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+          <div className="admin-responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
             
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.01)' }}>
               <span style={{ fontSize: '11px', fontWeight: '800', color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
@@ -132,7 +132,7 @@ export default function AdminDashboardPage() {
 
           {/* Pestañas de Navegación del Reporte */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.01)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+            <div className="admin-responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
               <button
                 onClick={() => setSeccionAbierta('ventas')}
                 style={{
@@ -204,7 +204,7 @@ export default function AdminDashboardPage() {
             <h3 style={{ fontSize: '14px', fontWeight: '800', margin: '0 0 16px 0', color: '#0f172a' }}>
               ⚡ Accesos Rápidos de Gestión
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+            <div className="admin-responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
               <Link href="/recepcion" style={{ textDecoration: 'none' }}>
                 <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '14px' }}>
                   <div style={{ backgroundColor: '#f1f5f9', padding: '12px', borderRadius: '12px', fontSize: '20px' }}>🚑</div>
@@ -245,7 +245,7 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Actividad Reciente */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+          <div className="admin-responsive-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0' }}>
               <h3 style={{ fontSize: '14px', fontWeight: '800', margin: '0 0 16px 0', color: '#0f172a' }}>
                 🩺 Últimos Triajes Registrados

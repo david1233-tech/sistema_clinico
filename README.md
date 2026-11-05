@@ -32,7 +32,13 @@ La URL HTTPS de Vercel se puede instalar como aplicación web desde el navegador
 
 ## Historial y adjuntos
 
-El historial de triajes se abre desde el encabezado de Enfermería y muestra pacientes en páginas de 12 tarjetas con búsqueda por nombre o DNI. Los triajes y tratamientos de vitaminas permiten adjuntar hasta 200 imágenes o PDF de 3 MB cada uno por registro. La tabla de adjuntos de vitaminas se crea al usar el módulo; para prepararla manualmente ejecute `database/migrate-vitaminas-adjuntos.sql`.
+El historial de triajes se abre desde el encabezado de Enfermería y muestra pacientes en páginas de 12 tarjetas. Puede buscar por nombre o DNI y filtrar por la inicial del primer apellido con el selector A–Z.
+
+En Vitaminas, los tratamientos guardados en una misma aplicación se muestran dentro de una sola tarjeta; una aplicación posterior aparece por separado. Al seleccionar un paciente puede subir imágenes o PDF sin registrar antes un tratamiento: se admiten hasta 200 archivos nuevos de 3 MB por paciente. Los adjuntos anteriores de cada tratamiento siguen disponibles en la galería del paciente. Las tablas se crean al usar el módulo; para prepararlas manualmente ejecute `database/migrate-vitaminas-adjuntos.sql` y `database/migrate-vitaminas-paciente-adjuntos.sql`.
+
+Las listas de pacientes de Vitaminas y Caja admiten búsqueda por inicial del primer apellido, nombre completo o DNI. En Caja, el mismo filtro alcanza el historial de cobros y no cambia los totales.
+
+Los módulos clínicos comparten una paleta, navegación y animaciones. La barra lateral muestra los nombres en pantallas amplias, se compacta en tablets y laptops pequeñas, y se abre como menú en celulares. Las cuadrículas se reorganizan según el ancho de pantalla. Los registros existentes no cambian por este ajuste visual.
 
 En dispositivos móviles, el inicio de sesión conserva una sesión segura durante 90 días para no volver a introducir las credenciales al abrir la aplicación. El nombre de usuario se recuerda; la contraseña no se almacena en el navegador.
 

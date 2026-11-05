@@ -777,9 +777,9 @@ function ConsultorioPageContent() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-100 font-sans text-slate-900">
+    <div className="module-shell flex min-h-screen bg-slate-100 font-sans text-slate-900">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 md:ml-64 transition-all">
+      <div className="module-content flex-1 flex flex-col min-w-0 md:ml-64 transition-all">
         <header className="h-16 md:h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8 sticky top-0 z-20 shadow-sm">
           <span className="text-xs md:text-sm text-slate-500 font-medium truncate">
             Módulo Médico / <strong className="text-slate-900">Atención en Consultorio</strong>
@@ -1138,4 +1138,3 @@ export default function ConsultorioPage() {
     </Suspense>
   );
 }
-

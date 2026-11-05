@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { coincideBusquedaPaciente } from '@/lib/busqueda-pacientes';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,7 @@ function CajaPageContent() {
   const [pacientesCola, setPacientesCola] = useState<PacienteCaja[]>([]);
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<PacienteCaja | null>(null);
   const [pagosRealizados, setPagosRealizados] = useState<RegistroCaja[]>([]);
+  const [busquedaCaja, setBusquedaCaja] = useState('');
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [form, setForm] = useState({
@@ -244,6 +246,8 @@ function CajaPageContent() {
   };
 
   const listaPagosValida = Array.isArray(pagosRealizados) ? pagosRealizados : [];
+  const pacientesFiltrados = pacientesCola.filter(p => coincideBusquedaPaciente(p.nombre_paciente || p.nombre || '', p.dni_paciente || p.dni || '', busquedaCaja));
+  const pagosFiltrados = listaPagosValida.filter(p => coincideBusquedaPaciente(p.nombre_paciente || '', p.dni_paciente || '', busquedaCaja));
   
   const totalCaja = listaPagosValida
     .filter(p => p.destino_pago === 'Caja')
@@ -254,9 +258,9 @@ function CajaPageContent() {
   const totalGeneral = totalCaja + totalDoctora;
 
   return (
-    <div className="flex min-h-screen bg-slate-100 font-sans text-slate-900">
+    <div className="module-shell flex min-h-screen bg-slate-100 font-sans text-slate-900">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 md:ml-64 transition-all">
+      <div className="module-content flex-1 flex flex-col min-w-0 md:ml-64 transition-all">
         <header className="h-16 md:h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8 sticky top-0 z-20 shadow-sm">
           <span className="text-xs md:text-sm text-slate-500 font-medium truncate">
             Módulo Caja / <strong className="text-slate-900">Gestión de Cobros y Facturación</strong>
@@ -291,20 +295,26 @@ function CajaPageContent() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[380px_460px_1fr] gap-6 items-start">
+          <div className="rounded-2xl border border-teal-200 bg-white p-4 shadow-sm">
+            <label htmlFor="buscar-caja" className="mb-2 block text-xs font-extrabold uppercase tracking-wider text-teal-900">Buscar en pacientes y cobros</label>
+            <input id="buscar-caja" type="search" value={busquedaCaja} onChange={event => setBusquedaCaja(event.target.value)} placeholder="Inicial del primer apellido, nombre o DNI..." className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-teal-600" />
+            <p className="m-0 mt-2 text-xs text-slate-500">Una letra muestra a quienes tienen el primer apellido con esa inicial. La búsqueda no modifica los totales de caja.</p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,0.8fr)_minmax(310px,1fr)] 2xl:grid-cols-[minmax(220px,0.8fr)_minmax(310px,1fr)_minmax(300px,1fr)] gap-6 items-start">
             
             <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-sm">
               <div className="p-4 text-white border-b border-slate-800">
                 <h3 className="m-0 text-sm font-extrabold text-white flex items-center gap-2">
-                  👥 Cola de Espera ({pacientesCola.length})
+                  👥 Pacientes ({pacientesFiltrados.length}/{pacientesCola.length})
                 </h3>
                 <p className="m-0 text-xs text-slate-400">Pacientes registrados</p>
               </div>
               <div className="p-3 flex flex-col gap-3 max-h-[580px] overflow-y-auto">
-                {pacientesCola.length === 0 ? (
-                  <div className="p-6 text-center text-slate-400 text-xs">No hay pacientes en la cola.</div>
+                {pacientesFiltrados.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 text-xs">No hay pacientes que coincidan con la búsqueda.</div>
                 ) : (
-                  pacientesCola.map((p) => {
+                  pacientesFiltrados.map((p) => {
                     const dniVal = p.dni_paciente || p.dni;
                     const isSelected = pacienteSeleccionado?.dni_paciente === dniVal || form.dni_paciente === dniVal;
                     return (
@@ -475,24 +485,24 @@ function CajaPageContent() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm lg:col-span-2 2xl:col-span-1">
               <div className="bg-slate-900 p-4 text-white flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-base">📊</div>
                   <div>
                     <h3 className="m-0 text-sm md:text-base font-extrabold text-white">Historial de Cobros Recientes</h3>
-                    <p className="m-0 text-xs text-slate-400">{listaPagosValida.length} transacciones</p>
+                    <p className="m-0 text-xs text-slate-400">{pagosFiltrados.length} de {listaPagosValida.length} transacciones</p>
                   </div>
                 </div>
               </div>
               <div className="p-4 flex flex-col gap-3.5 max-h-[580px] overflow-y-auto">
-                {listaPagosValida.length === 0 ? (
+                {pagosFiltrados.length === 0 ? (
                   <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">
                     <div className="text-3xl mb-2">💸</div>
-                    <p className="m-0 text-slate-700 text-xs font-bold">No hay pagos registrados.</p>
+                    <p className="m-0 text-slate-700 text-xs font-bold">No hay cobros que coincidan con la búsqueda.</p>
                   </div>
                 ) : (
-                  listaPagosValida.map((item) => (
+                  pagosFiltrados.map((item) => (
                     <div
                       key={item.id}
                       className="bg-white rounded-xl border border-slate-200 p-3.5 flex flex-col gap-2 hover:border-teal-300 transition-all shadow-sm"
@@ -549,4 +559,3 @@ export default function CajaPage() {
     </Suspense>
   );
 }
-

@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { coincideInicialApellido, primerApellido } from '@/lib/busqueda-pacientes';
 
 interface Triaje {
   id: string | number;
@@ -146,6 +147,8 @@ function fechaTriaje(t: Triaje) {
   return Number.isNaN(parsed.getTime()) ? fecha : parsed.toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+const letrasHistorial = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
 async function prepararFoto(archivo: File, ladoMaximo = 1800): Promise<File> {
   if (archivo.size <= 3 * 1024 * 1024 && ['image/jpeg', 'image/png', 'image/webp'].includes(archivo.type)) return archivo;
   const url = URL.createObjectURL(archivo);
@@ -180,6 +183,7 @@ function EnfermeriaContent() {
   const [saving, setSaving] = useState<boolean>(false);
   const [buscandoDni, setBuscandoDni] = useState<boolean>(false);
   const [filtro, setFiltro] = useState<string>('');
+  const [letraHistorial, setLetraHistorial] = useState('');
   const [historialAbierto, setHistorialAbierto] = useState(false);
   const [paginaHistorial, setPaginaHistorial] = useState(1);
   const [mostrarOpcionales, setMostrarOpcionales] = useState<boolean>(true);
@@ -568,10 +572,12 @@ function EnfermeriaContent() {
     registros.push(triaje);
     grupos.set(triaje.dni_paciente, registros);
     return grupos;
-  }, new Map<string, Triaje[]>()).values()).filter(registros =>
-    registros[0].nombre_paciente.toLowerCase().includes(filtro.toLowerCase()) ||
-    registros[0].dni_paciente.includes(filtro)
-  );
+  }, new Map<string, Triaje[]>()).values()).filter(registros => {
+    const paciente = registros[0];
+    const coincideTexto = paciente.nombre_paciente.toLowerCase().includes(filtro.toLowerCase()) || paciente.dni_paciente.includes(filtro);
+    const coincideLetra = coincideInicialApellido(paciente.nombre_paciente, letraHistorial);
+    return coincideTexto && coincideLetra;
+  }).sort((a, b) => primerApellido(a[0].nombre_paciente).localeCompare(primerApellido(b[0].nombre_paciente), 'es-PE', { sensitivity: 'base' }));
   const registrosPaciente = triajes.filter(t => t.dni_paciente === dniHistorial);
   const totalPaginasHistorial = Math.max(1, Math.ceil(historialAgrupado.length / 12));
 
@@ -633,9 +639,9 @@ function EnfermeriaContent() {
         )}
       </div>
 
-      <div className="flex min-h-screen bg-slate-100 font-sans text-slate-900 print:hidden">
+      <div className="module-shell flex min-h-screen bg-slate-100 font-sans text-slate-900 print:hidden">
         <Sidebar />
-        <div className="flex-1 flex flex-col min-w-0 md:ml-64 transition-all">
+        <div className="module-content flex-1 flex flex-col min-w-0 md:ml-64 transition-all">
           <header className="h-16 md:h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8 sticky top-0 z-20 shadow-sm">
             <span className="text-xs md:text-sm text-slate-500 font-medium truncate">
               Módulo Enfermería / <strong className="text-slate-900">Control de Signos Vitales y Triaje</strong>
@@ -952,6 +958,10 @@ function EnfermeriaContent() {
                   className="w-full sm:w-56 p-2 rounded-xl border border-slate-700 bg-slate-800 text-white text-xs outline-none"
                 />
                 <button type="button" onClick={() => setHistorialAbierto(false)} className="text-white font-bold" aria-label="Cerrar historial">✕ Cerrar</button>
+              </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto border-b border-slate-200 bg-slate-50 px-4 py-3" aria-label="Filtrar pacientes por inicial del primer apellido">
+                <button type="button" onClick={() => { setLetraHistorial(''); setPaginaHistorial(1); }} aria-pressed={!letraHistorial} className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold ${!letraHistorial ? 'bg-teal-700 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}>Todos</button>
+                {letrasHistorial.map(letra => <button key={letra} type="button" onClick={() => { setLetraHistorial(letra); setPaginaHistorial(1); }} aria-pressed={letraHistorial === letra} className={`shrink-0 h-8 w-8 rounded-lg text-xs font-bold ${letraHistorial === letra ? 'bg-teal-700 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-teal-50'}`}>{letra}</button>)}
               </div>
               
               <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3.5 overflow-y-auto">

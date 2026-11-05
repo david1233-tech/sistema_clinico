@@ -164,6 +164,109 @@ html[data-intro-seen] .intro {
     }
   }
 }
+
+/* Lenguaje visual compartido por los módulos clínicos. */
+.module-shell {
+  background: radial-gradient(circle at 85% 0%, #e4f5f1 0, transparent 30%),
+    linear-gradient(145deg, #f4f8fa 0%, #edf3f5 100%) !important;
+  color: #16313d;
+}
+
+.module-shell .module-content {
+  min-width: 0;
+  margin-left: 70px !important;
+}
+
+.module-shell .module-content > header {
+  background: rgb(255 255 255 / .88) !important;
+  border-bottom: 1px solid #dbe8e9 !important;
+  box-shadow: 0 9px 30px rgb(17 70 77 / .04) !important;
+  backdrop-filter: blur(18px);
+}
+
+.module-shell .module-content > header strong { color: #125c65; }
+.module-shell .module-content > main { width: 100%; max-width: 1500px; margin-inline: auto; }
+.module-shell .module-content main :is(div, section, article, form).bg-white {
+  border-color: #dbe8e9;
+  box-shadow: 0 8px 30px rgb(19 61 73 / .055);
+}
+.module-shell .module-content main > div[style*="background-color"] {
+  border-color: #dbe8e9 !important;
+  border-radius: 22px !important;
+  box-shadow: 0 8px 30px rgb(19 61 73 / .06) !important;
+}
+.module-shell .module-content main :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
+  transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+}
+.module-shell .module-content main :is(input, select, textarea):focus-visible {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 4px rgb(13 148 136 / .12);
+}
+.module-shell .module-content main h1 { letter-spacing: -.035em; }
+.module-shell .module-content main :is(button, a) { transition: transform .22s ease, box-shadow .22s ease, background-color .22s ease, border-color .22s ease; }
+.module-shell .module-content main button[class*="bg-teal-"]:not(:disabled):hover,
+.module-shell .module-content main a[class*="bg-teal-"]:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgb(13 105 105 / .18); }
+
+.sidebar-shell {
+  background: linear-gradient(165deg, #102e40 0%, #0c3a47 50%, #102738 100%) !important;
+  border-right-color: rgb(255 255 255 / .1) !important;
+  box-shadow: 8px 0 35px rgb(12 48 62 / .1);
+}
+.sidebar-shell nav a { position: relative; }
+.sidebar-shell nav a:hover { transform: translateX(3px); }
+.sidebar-shell nav a[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 24%;
+  bottom: 24%;
+  width: 3px;
+  border-radius: 3px;
+  background: #8be2cf;
+}
+.module-patient-files { background: linear-gradient(135deg, #fff 45%, #ecf9f4 100%) !important; }
+
+@media (min-width: 1280px) {
+  .sidebar-shell { width: 252px !important; }
+  .sidebar-shell .sidebar-label { opacity: 1 !important; }
+  .module-shell .module-content { margin-left: 252px !important; }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .module-shell .admin-responsive-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .module-shell .module-content > main > :not(.fixed) { animation: module-enter .7s cubic-bezier(.22,1,.36,1) both; }
+  .module-shell .module-content > main > :nth-child(2) { animation-delay: 80ms; }
+  .module-shell .module-content > main > :nth-child(3) { animation-delay: 160ms; }
+  .module-shell .module-content > main > :nth-child(4) { animation-delay: 240ms; }
+  .module-shell .module-content > main > :nth-child(n+5) { animation-delay: 320ms; }
+  .sidebar-shell nav a { transition: transform .22s ease, background-color .22s ease, color .22s ease; }
+  @keyframes module-enter { from { opacity: 0; transform: translateY(16px); } }
+}
+
+@media (max-width: 767px) {
+  .module-shell .module-content { margin-left: 0 !important; }
+  .module-shell .module-content > header {
+    height: auto !important;
+    min-height: 68px;
+    flex-wrap: wrap;
+    gap: .5rem;
+    padding: .75rem 1rem .75rem 4.5rem !important;
+  }
+  .module-shell .module-content > main { padding: 1.25rem !important; }
+  .sidebar-shell { width: min(86vw, 300px) !important; transform: translateX(-100%) !important; }
+  .sidebar-shell.sidebar-open { transform: translateX(0) !important; }
+  .sidebar-shell .sidebar-label { opacity: 1 !important; }
+  .module-shell .admin-responsive-grid { grid-template-columns: minmax(0, 1fr) !important; }
+}
+
+@media print {
+  .module-shell { background: white !important; }
+  .module-shell .module-content { margin-left: 0 !important; }
+  .module-shell .module-content > main > * { animation: none !important; }
+}
 @media (prefers-reduced-motion: no-preference) {
   .login-card { animation: login-appear 700ms cubic-bezier(.2,.8,.2,1) both; }
   .login-stage-leaving .login-card { animation: login-leave 650ms cubic-bezier(.4,0,.8,.2) both; }

@@ -2,9 +2,9 @@ import Sidebar from '@/components/Sidebar';
 
 export default function HospitalizacionPage() {
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f1f5f9', fontFamily: 'system-ui, sans-serif', color: '#1e293b' }}>
+    <div className="module-shell" style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f1f5f9', fontFamily: 'system-ui, sans-serif', color: '#1e293b' }}>
       <Sidebar />
-      <div style={{ marginLeft: '270px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div className="module-content" style={{ marginLeft: '270px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         <header style={{ height: '70px', backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 35px', position: 'sticky', top: 0, zIndex: 10 }}>
           <span style={{ fontSize: '14px', color: '#64748b', fontWeight: '500' }}>Módulo / <strong style={{ color: '#0f172a' }}>Hospitalización</strong></span>
           <span style={{ fontSize: '14px', color: '#334155', fontWeight: '600' }}>Área de Internados</span>
