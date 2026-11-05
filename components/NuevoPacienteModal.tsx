@@ -2,22 +2,35 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
+
+const formularioVacio = { dni: '', nombre: '', telefono: '', direccion: '', edad: '', genero: '' };
 
 export default function NuevoPacienteModal() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    dni: '',
-    nombre: '',
-    telefono: '',
-    direccion: '',
-    edad: '',
-    genero: ''
-  });
+  const [formData, setFormData] = useState(formularioVacio);
   const [loading, setLoading] = useState(false);
   const [buscandoDni, setBuscandoDni] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
   const dniActual = useRef('');
+  const dniInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const overflowPrevio = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const foco = !loading ? requestAnimationFrame(() => dniInputRef.current?.focus()) : 0;
+    const cerrarConEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !loading) setOpen(false);
+    };
+    window.addEventListener('keydown', cerrarConEscape);
+    return () => {
+      if (foco) cancelAnimationFrame(foco);
+      document.body.style.overflow = overflowPrevio;
+      window.removeEventListener('keydown', cerrarConEscape);
+    };
+  }, [open, loading]);
 
   const consultarReniec = useCallback(async (dni: string, signal?: AbortSignal) => {
     if (!/^\d{8}$/.test(dni)) return;
@@ -70,6 +83,9 @@ export default function NuevoPacienteModal() {
       const data = await res.json();
       if (res.ok) {
         setOpen(false);
+        setFormData(formularioVacio);
+        setMensaje(null);
+        dniActual.current = '';
         router.push(`/recepcion?dni=${encodeURIComponent(data.dni)}`);
 
       } else {
@@ -85,16 +101,17 @@ export default function NuevoPacienteModal() {
   return (
     <>
       <button 
+        type="button"
         onClick={() => setOpen(true)}
-        className="btn-hover"
+        className="btn-hover nuevo-paciente-trigger"
         style={{ padding: '11px 22px', backgroundColor: '#0d9488', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '800', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(13, 148, 136, 0.25)' }}
       >
-        <span>➕</span> Registrar Nuevo Paciente
+        <span>＋</span> REGISTRAR NUEVO PACIENTE
       </button>
 
-      {open && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '20px' }}>
-          <div style={{ backgroundColor: '#fff', width: '100%', maxWidth: '560px', borderRadius: '22px', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', border: '1px solid #e2e8f0' }}>
+      {open && typeof document !== 'undefined' && createPortal(
+        <div className="nuevo-paciente-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setOpen(false); }}>
+          <div className="nuevo-paciente-card" role="dialog" aria-modal="true" aria-labelledby="titulo-nuevo-paciente">
             
             {/* Cabecera del Modal */}
             <div style={{ background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', padding: '22px 28px', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -103,19 +120,22 @@ export default function NuevoPacienteModal() {
                   📋
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#ffffff' }}>Nuevo Paciente</h3>
+                  <h3 id="titulo-nuevo-paciente" style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#ffffff' }}>Registrar nuevo paciente</h3>
                   <p style={{ margin: 0, fontSize: '12px', color: '#ccfbf1' }}>Añadir nuevo registro clínico</p>
                 </div>
               </div>
               <button 
+                type="button"
                 onClick={() => setOpen(false)} 
+                disabled={loading}
+                aria-label="Cerrar registro de paciente"
                 style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#ffffff', width: '32px', height: '32px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
                 ✕
               </button>
             </div>
 
-            <div style={{ padding: '28px' }}>
+            <div className="nuevo-paciente-body" style={{ padding: '28px' }}>
               {mensaje && (
                 <div style={{ padding: '12px 16px', borderRadius: '10px', marginBottom: '18px', fontSize: '13px', fontWeight: '600', backgroundColor: mensaje.tipo === 'exito' ? '#f0fdf4' : '#fff1f2', color: mensaje.tipo === 'exito' ? '#15803d' : '#9f1239', border: `1px solid ${mensaje.tipo === 'exito' ? '#bbf7d0' : '#fecdd3'}` }}>
                   {mensaje.texto}
@@ -129,6 +149,7 @@ export default function NuevoPacienteModal() {
                   <label style={{ fontSize: '11px', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>NÚMERO DE DNI *</label>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <input 
+                      ref={dniInputRef}
                       required 
                       type="text" 
                       maxLength={8}
@@ -170,7 +191,7 @@ export default function NuevoPacienteModal() {
                 </div>
 
                 {/* Teléfono y Edad */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div className="nuevo-paciente-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                   <div>
                     <label style={{ fontSize: '11px', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>TELÉFONO / CELULAR</label>
                     <input 
@@ -194,7 +215,7 @@ export default function NuevoPacienteModal() {
                 </div>
 
                 {/* Género y Dirección */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div className="nuevo-paciente-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                   <div>
                     <label style={{ fontSize: '11px', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>GÉNERO</label>
                     <select 
@@ -220,10 +241,11 @@ export default function NuevoPacienteModal() {
                 </div>
 
                 {/* Botones de acción inferiores */}
-                <div style={{ display: 'flex', gap: '12px', marginTop: '14px', justifyContent: 'flex-end' }}>
+                <div className="nuevo-paciente-actions" style={{ display: 'flex', gap: '12px', marginTop: '14px', justifyContent: 'flex-end' }}>
                   <button 
                     type="button" 
                     onClick={() => setOpen(false)} 
+                    disabled={loading}
                     style={{ padding: '12px 22px', backgroundColor: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: '750', fontSize: '13.5px', cursor: 'pointer' }}
                   >
                     Cancelar
@@ -239,7 +261,7 @@ export default function NuevoPacienteModal() {
               </form>
             </div>
           </div>
-        </div>
+        </div>, document.body
       )}
     </>
   );

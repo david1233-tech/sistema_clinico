@@ -267,6 +267,59 @@ html[data-intro-seen] .intro {
   .module-shell .module-content { margin-left: 0 !important; }
   .module-shell .module-content > main > * { animation: none !important; }
 }
+
+.nuevo-paciente-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(8 32 45 / .72);
+  backdrop-filter: blur(8px);
+}
+.nuevo-paciente-card {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 600px);
+  max-height: min(90dvh, 820px);
+  overflow: hidden;
+  border: 1px solid #cfe3e4;
+  border-radius: 24px;
+  background: white;
+  box-shadow: 0 32px 90px rgb(4 37 49 / .3);
+}
+.nuevo-paciente-card > div:first-child {
+  flex: none;
+  background: linear-gradient(125deg, #12384c 0%, #0b7777 100%) !important;
+}
+.nuevo-paciente-body { overflow-y: auto; overscroll-behavior: contain; }
+.nuevo-paciente-body input,
+.nuevo-paciente-body select { transition: border-color .2s ease, box-shadow .2s ease; }
+.nuevo-paciente-body input:focus-visible,
+.nuevo-paciente-body select:focus-visible {
+  border-color: #0d9488 !important;
+  box-shadow: 0 0 0 4px rgb(13 148 136 / .13);
+}
+.nuevo-paciente-trigger { transition: transform .2s ease, box-shadow .2s ease; }
+.nuevo-paciente-trigger:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgb(13 105 105 / .2) !important; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .nuevo-paciente-overlay { animation: nuevo-paciente-fondo .22s ease both; }
+  .nuevo-paciente-card { animation: nuevo-paciente-entrada .38s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes nuevo-paciente-fondo { from { opacity: 0; } }
+  @keyframes nuevo-paciente-entrada { from { opacity: 0; transform: translateY(18px) scale(.97); } }
+}
+
+@media (max-width: 560px) {
+  .nuevo-paciente-overlay { padding: 10px; }
+  .nuevo-paciente-card { max-height: 94dvh; border-radius: 18px; }
+  .nuevo-paciente-body { padding: 18px !important; }
+  .nuevo-paciente-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .nuevo-paciente-actions { flex-direction: column-reverse; }
+  .nuevo-paciente-actions button { width: 100%; }
+}
 @media (prefers-reduced-motion: no-preference) {
   .login-card { animation: login-appear 700ms cubic-bezier(.2,.8,.2,1) both; }
   .login-stage-leaving .login-card { animation: login-leave 650ms cubic-bezier(.4,0,.8,.2) both; }
