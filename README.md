@@ -26,7 +26,7 @@ En el proyecto abre **Settings → Environment Variables**. Agrega las siguiente
 
 Genera un `AUTH_SECRET` con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Las contraseñas se configuran en Vercel, nunca en el repositorio público. Después de guardar las variables, abre **Deployments** y ejecuta **Redeploy** en el despliegue más reciente. Si el proyecto está conectado a GitHub, Vercel también puede desplegar los cambios nuevos de `main` automáticamente, pero las variables agregadas requieren un despliegue nuevo.
 
-Para la consulta automática de DNI, configura también `RENIEC_API_URL` (URL HTTPS con `{dni}`) y `RENIEC_API_TOKEN` del proveedor. Sin ellos, el formulario permite rellenar los datos a mano.
+Para la consulta automática de DNI con JSON.pe, configura `RENIEC_API_TOKEN` como variable de entorno privada en Vercel y vuelve a desplegar. Al ingresar los 8 dígitos, el formulario consulta `POST https://api.json.pe/api/dni` y completa nombres y apellidos. Sin la clave, permite rellenar los datos a mano.
 
 La URL HTTPS de Vercel se puede instalar como aplicación web desde el navegador del móvil. La información clínica requiere internet y se comparte mediante la misma base Supabase.
 
@@ -45,3 +45,4 @@ En dispositivos móviles, el inicio de sesión conserva una sesión segura duran
 ## Desarrollo local
 
 Instala dependencias con `npm install` y ejecuta `npm run dev`. Crea `.env.local` con las mismas variables que uses en Vercel. Ese archivo está ignorado por Git. Si deseas mantener la antigua instalación MySQL, usa una versión anterior del proyecto: esta versión usa PostgreSQL.
+
