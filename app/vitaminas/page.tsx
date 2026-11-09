@@ -605,7 +605,7 @@ function VitaminasPageContent() {
               type="text"
               placeholder="Escriba nombre, apellido o DNI..."
               value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
+              onChange={(e) => { setBusqueda(e.target.value); setLetraNombre(''); }}
               className="flex-1 border-none outline-none font-bold text-slate-900 text-xs md:text-sm bg-transparent"
             />
             {busqueda && (
