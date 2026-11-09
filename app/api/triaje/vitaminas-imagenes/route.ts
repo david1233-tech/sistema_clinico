@@ -3,7 +3,7 @@ import { pgPool } from '@/lib/db';
 import { ensureTriajeVitaminasImagenes } from '@/lib/triaje-vitaminas-imagenes';
 
 const tipos = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-const fechaValida = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
+const fechaValida = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && !Number.isNaN(Date.parse(value));
 
 export async function GET(request: Request) {
   const dni = new URL(request.url).searchParams.get('dni') || '';

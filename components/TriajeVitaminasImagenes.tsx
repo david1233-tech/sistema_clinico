@@ -34,7 +34,7 @@ export default function TriajeVitaminasImagenes({ dni }: { dni: string }) {
     setOcupado(true); setMensaje('');
     try {
       const form = new FormData();
-      form.set('dni', dni); form.set('archivo', archivo); form.set('fecha_aplicacion', fecha);
+      form.set('dni', dni); form.set('archivo', archivo); form.set('fecha_aplicacion', new Date(fecha).toISOString());
       const response = await fetch('/api/triaje/vitaminas-imagenes', { method: 'POST', body: form });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
@@ -49,7 +49,7 @@ export default function TriajeVitaminasImagenes({ dni }: { dni: string }) {
   const guardarFecha = async (id: string) => {
     setOcupado(true); setMensaje('');
     try {
-      const response = await fetch('/api/triaje/vitaminas-imagenes', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, fecha_aplicacion: fechaEditada }) });
+      const response = await fetch('/api/triaje/vitaminas-imagenes', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, fecha_aplicacion: new Date(fechaEditada).toISOString() }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       setImagenes(prev => prev.map(item => String(item.id) === String(id) ? data : item)); setEditando(null);

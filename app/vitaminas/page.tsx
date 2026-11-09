@@ -29,7 +29,7 @@ interface Tratamiento {
   activo: boolean;
 }
 
-interface AdjuntoVitamina { id: number; nombre: string; tipo: string; fecha: string; origen: 'paciente' | 'tratamiento' }
+interface AdjuntoVitamina { id: number; nombre: string; tipo: string; fecha: string; fecha_aplicacion?: string | null; origen: 'paciente' | 'tratamiento' | 'triaje_vitaminas' }
 const TIPOS_ADJUNTOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
 
 interface VitaminaAdicional {
@@ -472,7 +472,7 @@ function VitaminasPageContent() {
 
   const eliminarAdjunto = async (item: AdjuntoVitamina) => {
     if (!confirm('¿Eliminar este archivo?')) return;
-    const ruta = item.origen === 'paciente' ? '/api/vitaminas/paciente-adjuntos' : '/api/vitaminas/adjuntos';
+    const ruta = item.origen === 'paciente' ? '/api/vitaminas/paciente-adjuntos' : item.origen === 'triaje_vitaminas' ? '/api/triaje/vitaminas-imagenes' : '/api/vitaminas/adjuntos';
     const response = await fetch(`${ruta}?id=${item.id}`, { method: 'DELETE' });
     if (response.ok) setAdjuntos(prev => prev.filter(archivo => archivo.id !== item.id || archivo.origen !== item.origen));
     else alert('No se pudo eliminar el archivo.');
@@ -908,8 +908,8 @@ function VitaminasPageContent() {
                     <div className="mt-4 grid gap-2 sm:grid-cols-2">
                       {adjuntos.map(item => <div key={`${item.origen}-${item.id}`} className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs min-w-0">
                         <span aria-hidden="true">{item.tipo === 'application/pdf' ? '📄' : '🖼️'}</span>
-                        <span className="min-w-0 flex-1 truncate" title={item.nombre}>{item.nombre}{item.origen === 'tratamiento' && <small className="block text-slate-500">Tratamiento anterior</small>}</span>
-                        <a href={`${item.origen === 'paciente' ? '/api/vitaminas/paciente-adjuntos' : '/api/vitaminas/adjuntos'}/${item.id}`} target="_blank" rel="noopener noreferrer" className="font-bold text-teal-800">Abrir</a>
+                        <span className="min-w-0 flex-1 truncate" title={item.nombre}>{item.nombre}{item.origen === 'tratamiento' && <small className="block text-slate-500">Tratamiento anterior</small>}{item.origen === 'triaje_vitaminas' && <small className="block text-violet-700">Vitaminas desde Enfermería · Aplicación: {item.fecha_aplicacion ? new Date(item.fecha_aplicacion).toLocaleString('es-PE') : 'Sin fecha'} · Subida: {new Date(item.fecha).toLocaleString('es-PE')}</small>}</span>
+                        <a href={`${item.origen === 'paciente' ? '/api/vitaminas/paciente-adjuntos' : item.origen === 'triaje_vitaminas' ? '/api/triaje/vitaminas-imagenes' : '/api/vitaminas/adjuntos'}/${item.id}`} target="_blank" rel="noopener noreferrer" className="font-bold text-teal-800">Abrir</a>
                         <button type="button" onClick={() => eliminarAdjunto(item)} disabled={subiendoAdjuntos} className="font-bold text-rose-700">Eliminar</button>
                       </div>)}
                     </div>

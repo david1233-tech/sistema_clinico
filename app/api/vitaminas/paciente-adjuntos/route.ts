@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { pgPool } from '@/lib/db';
 import { ensureVitaminasAdjuntos } from '@/lib/vitaminas-adjuntos';
 import { ensureVitaminasPacienteAdjuntos } from '@/lib/vitaminas-paciente-adjuntos';
+import { ensureTriajeVitaminasImagenes } from '@/lib/triaje-vitaminas-imagenes';
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const TIPOS = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']);
@@ -10,12 +11,15 @@ export async function GET(request: Request) {
   const dni = new URL(request.url).searchParams.get('dni') || '';
   if (!/^\d{8}$/.test(dni)) return NextResponse.json({ error: 'DNI inválido' }, { status: 400 });
   try {
-    await Promise.all([ensureVitaminasAdjuntos(), ensureVitaminasPacienteAdjuntos()]);
+    await Promise.all([ensureVitaminasAdjuntos(), ensureVitaminasPacienteAdjuntos(), ensureTriajeVitaminasImagenes()]);
     const result = await pgPool.query(`
-      SELECT id, nombre, tipo, fecha, 'paciente' AS origen FROM vitaminas_paciente_adjuntos WHERE dni_paciente = $1
+      SELECT id, nombre, tipo, fecha, NULL::timestamptz AS fecha_aplicacion, 'paciente' AS origen FROM vitaminas_paciente_adjuntos WHERE dni_paciente = $1
       UNION ALL
-      SELECT a.id, a.nombre, a.tipo, a.fecha, 'tratamiento' AS origen
+      SELECT a.id, a.nombre, a.tipo, a.fecha, NULL::timestamptz AS fecha_aplicacion, 'tratamiento' AS origen
       FROM vitaminas_adjuntos a JOIN recetas r ON r.id = a.receta_id WHERE r.dni_paciente = $1
+      UNION ALL
+      SELECT id, nombre, tipo, fecha_subida AS fecha, fecha_aplicacion, 'triaje_vitaminas' AS origen
+      FROM triaje_vitaminas_imagenes WHERE dni_paciente = $1
       ORDER BY fecha DESC, id DESC
     `, [dni]);
     return NextResponse.json(result.rows);
