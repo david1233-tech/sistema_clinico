@@ -10,7 +10,7 @@ const localDateTime = (value: string | Date) => {
 
 export default function TriajeVitaminasImagenes({ dni }: { dni: string }) {
   const [imagenes, setImagenes] = useState<Imagen[]>([]);
-  const [archivo, setArchivo] = useState<File | null>(null);
+  const [archivos, setArchivos] = useState<File[]>([]);
   const [fecha, setFecha] = useState(() => localDateTime(new Date()));
   const [editando, setEditando] = useState<string | null>(null);
   const [fechaEditada, setFechaEditada] = useState('');
@@ -29,20 +29,30 @@ export default function TriajeVitaminasImagenes({ dni }: { dni: string }) {
 
   const subir = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!archivo || !dni) return;
-    if (imagenes.length >= 200) { setMensaje('Máximo 200 imágenes de vitaminas por paciente'); return; }
+    if (!archivos.length || !dni) return;
+    if (imagenes.length + archivos.length > 200) { setMensaje('Máximo 200 imágenes de vitaminas por paciente'); return; }
     setOcupado(true); setMensaje('');
+    let guardadas = 0;
     try {
-      const form = new FormData();
-      form.set('dni', dni); form.set('archivo', archivo); form.set('fecha_aplicacion', new Date(fecha).toISOString());
-      const response = await fetch('/api/triaje/vitaminas-imagenes', { method: 'POST', body: form });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-      setImagenes(prev => [data, ...prev]); setArchivo(null); setFecha(localDateTime(new Date()));
+      const fechaAplicacion = new Date(fecha).toISOString();
+      for (const archivo of archivos) {
+        setMensaje(`Guardando ${guardadas + 1} de ${archivos.length}: ${archivo.name}`);
+        const form = new FormData();
+        form.set('dni', dni); form.set('archivo', archivo); form.set('fecha_aplicacion', fechaAplicacion);
+        const response = await fetch('/api/triaje/vitaminas-imagenes', { method: 'POST', body: form });
+        const data = await response.json();
+        if (!response.ok) throw new Error(`${archivo.name}: ${data.error || 'No se pudo guardar'}`);
+        setImagenes(prev => [data, ...prev]);
+        guardadas++;
+      }
+      setArchivos([]); setFecha(localDateTime(new Date()));
       const input = document.getElementById('triaje-vitaminas-archivo') as HTMLInputElement | null;
       if (input) input.value = '';
-      setMensaje('Imagen guardada. Puede corregir la fecha y hora cuando lo necesite.');
-    } catch (error) { setMensaje(error instanceof Error ? error.message : 'No se pudo subir la imagen'); }
+      setMensaje(`${guardadas} imagen(es) guardada(s). Puede editar la fecha y hora de cada una por separado.`);
+    } catch (error) {
+      if (guardadas) setArchivos(prev => prev.slice(guardadas));
+      setMensaje(`${guardadas} imagen(es) guardada(s). ${error instanceof Error ? error.message : 'No se pudo continuar'}`);
+    }
     finally { setOcupado(false); }
   };
 
@@ -69,12 +79,12 @@ export default function TriajeVitaminasImagenes({ dni }: { dni: string }) {
   };
 
   return <section className="bg-white rounded-2xl p-5 border border-violet-200 shadow-sm flex flex-col gap-4">
-    <div><h2 className="text-base font-extrabold m-0 text-slate-900">💉 Imágenes de vitaminas ({imagenes.length}/200)</h2><p className="text-xs text-slate-500 mt-1 mb-0">Fotos del paciente seleccionado. Indique cuándo se aplicaron las vitaminas; la fecha de subida se registra automáticamente.</p></div>
+    <div><h2 className="text-base font-extrabold m-0 text-slate-900">💉 Imágenes de vitaminas ({imagenes.length}/200)</h2><p className="text-xs text-slate-500 mt-1 mb-0">Seleccione varias fotos y guárdelas juntas. Después puede editar la fecha y hora de aplicación de cada imagen; la fecha de subida se registra automáticamente.</p></div>
     {!dni && <p className="text-sm text-amber-700">Seleccione un paciente para agregar o consultar sus imágenes.</p>}
     <form onSubmit={subir} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
-      <label className="text-xs font-bold text-slate-700">Imagen<input id="triaje-vitaminas-archivo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required disabled={!dni || ocupado} onChange={event => setArchivo(event.target.files?.[0] || null)} className="block w-full mt-1 text-xs" /></label>
+      <label className="text-xs font-bold text-slate-700">Imágenes<input id="triaje-vitaminas-archivo" type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" required disabled={!dni || ocupado} onChange={event => setArchivos(Array.from(event.target.files || []))} className="block w-full mt-1 text-xs" />{archivos.length > 0 && <span className="block mt-1 text-violet-700">{archivos.length} imagen(es) seleccionada(s)</span>}</label>
       <label className="text-xs font-bold text-slate-700">Fecha y hora de aplicación<input type="datetime-local" required value={fecha} onChange={event => setFecha(event.target.value)} disabled={!dni || ocupado} className="block w-full mt-1 p-2 rounded-lg border border-slate-300" /></label>
-      <button type="submit" disabled={!dni || ocupado || imagenes.length >= 200} className="bg-violet-600 text-white px-4 py-2 rounded-lg font-bold text-xs disabled:opacity-50">Guardar imagen</button>
+      <button type="submit" disabled={!dni || ocupado || !archivos.length || imagenes.length + archivos.length > 200} className="bg-violet-600 text-white px-4 py-2 rounded-lg font-bold text-xs disabled:opacity-50">Guardar {archivos.length || ''} imagen(es)</button>
     </form>
     {mensaje && <p role="status" className="text-xs text-slate-700 m-0">{mensaje}</p>}
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">

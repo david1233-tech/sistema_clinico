@@ -939,7 +939,7 @@ function EnfermeriaContent() {
                 {registroEditando && <button type="button" onClick={cancelarEdicion} disabled={saving} className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-300 cursor-pointer">Cancelar edición y volver a nuevo registro</button>}
               </form>
               <div className="p-5 pt-0">
-                <TriajeVitaminasImagenes dni={form.dni_paciente} />
+                <TriajeVitaminasImagenes key={form.dni_paciente} dni={form.dni_paciente} />
               </div>
             </div>
 
