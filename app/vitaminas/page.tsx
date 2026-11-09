@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { agruparSesiones } from '@/lib/vitaminas-sesiones';
-import { coincideBusquedaPaciente, normalizarBusqueda, primerApellido } from '@/lib/busqueda-pacientes';
+import { normalizarBusqueda } from '@/lib/busqueda-pacientes';
 
 interface Paciente {
   id: string | number;
@@ -168,12 +168,14 @@ function VitaminasPageContent() {
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [tratamientos, setTratamientos] = useState<Tratamiento[]>([]);
   const [busqueda, setBusqueda] = useState<string>('');
+  const [letraNombre, setLetraNombre] = useState('');
   const [busquedaVitamina, setBusquedaVitamina] = useState('');
   const [mostrarCatalogo, setMostrarCatalogo] = useState(false);
   const catalogoRef = useRef<HTMLDivElement>(null);
   const [viaOpcion, setViaOpcion] = useState('');
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [errorPacientes, setErrorPacientes] = useState('');
   const [saving, setSaving] = useState<boolean>(false);
   const [registroEditando, setRegistroEditando] = useState<Tratamiento | null>(null);
   const [vitaminasAdicionales, setVitaminasAdicionales] = useState<VitaminaAdicional[]>([]);
@@ -252,6 +254,7 @@ function VitaminasPageContent() {
   const fetchPacientesTodos = async () => {
     try {
       setLoading(true);
+      setErrorPacientes('');
       const resTriaje = await fetch('/api/triaje');
       let triajesData: any[] = [];
       if (resTriaje.ok) {
@@ -261,10 +264,18 @@ function VitaminasPageContent() {
       let basePacientesData: any[] = [];
       if (resPacientes.ok) {
         basePacientesData = await resPacientes.json();
+      } else {
+        setErrorPacientes('No se pudo cargar el padrón de Recepción. Puede intentar recargar la página.');
       }
-      const resVitaminas = await fetch('/api/vitaminas', { cache: 'no-store' });
-      if (!resVitaminas.ok) throw new Error((await resVitaminas.json()).error || 'No se pudieron cargar los tratamientos');
-      const tratamientosCargados: Tratamiento[] = await resVitaminas.json();
+      let tratamientosCargados: Tratamiento[] = [];
+      try {
+        const resVitaminas = await fetch('/api/vitaminas', { cache: 'no-store' });
+        if (!resVitaminas.ok) throw new Error((await resVitaminas.json()).error || 'No se pudieron cargar los tratamientos');
+        tratamientosCargados = await resVitaminas.json();
+      } catch (error) {
+        console.error('Error cargando historial de vitaminas:', error);
+        setErrorPacientes('Los pacientes están disponibles, pero no se pudo cargar el historial de tratamientos. Recargue antes de guardar cambios.');
+      }
       setTratamientos(tratamientosCargados);
       const mapaPacientes = new Map<string, Paciente>();
       basePacientesData.forEach((p) => {
@@ -316,6 +327,7 @@ function VitaminasPageContent() {
       setPacientes(listaCompleta);
     } catch (err) {
       console.error('Error cargando lista unificada de vitaminas:', err);
+      setErrorPacientes('No se pudo cargar la lista de pacientes. Intente recargar la página.');
     } finally {
       setLoading(false);
     }
@@ -525,8 +537,13 @@ function VitaminasPageContent() {
     }
   };
 
-  const pacientesFiltrados = pacientes.filter(p => coincideBusquedaPaciente(p.nombre_paciente || '', p.dni_paciente || '', busqueda))
-    .sort((a, b) => primerApellido(a.nombre_paciente).localeCompare(primerApellido(b.nombre_paciente), 'es-PE', { sensitivity: 'base' }));
+  const terminoPaciente = normalizarBusqueda(busqueda);
+  const pacientesFiltrados = pacientes.filter(p => {
+    const nombre = normalizarBusqueda(p.nombre_paciente || '');
+    const primerNombre = nombre.split(/\s+/)[0] || '';
+    const coincideTexto = !terminoPaciente || nombre.includes(terminoPaciente) || String(p.dni_paciente || '').includes(terminoPaciente);
+    return coincideTexto && (!letraNombre || primerNombre.startsWith(normalizarBusqueda(letraNombre)));
+  }).sort((a, b) => (a.nombre_paciente || '').localeCompare(b.nombre_paciente || '', 'es-PE', { sensitivity: 'base' }));
 
   const totalAplicados = pacientes.filter(p => p.aplicaVitamina).length;
   const totalPendientes = pacientes.length - totalAplicados;
@@ -586,7 +603,7 @@ function VitaminasPageContent() {
             <span className="text-lg">🔍</span>
             <input
               type="text"
-              placeholder="Inicial del primer apellido, nombre o DNI..."
+              placeholder="Escriba nombre, apellido o DNI..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               className="flex-1 border-none outline-none font-bold text-slate-900 text-xs md:text-sm bg-transparent"
@@ -601,25 +618,33 @@ function VitaminasPageContent() {
             )}
           </div>
 
+          {errorPacientes && <p role="alert" className="m-0 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">{errorPacientes}</p>}
+
           <div className="flex flex-col gap-6">
             <div className="bg-white rounded-2xl border border-sky-200 overflow-hidden shadow-sm">
               <div className="bg-gradient-to-r from-sky-700 via-teal-700 to-emerald-700 p-4 text-white">
                 <h3 className="m-0 text-sm md:text-base font-extrabold text-white">👥 Lista de Pacientes</h3>
-                <p className="m-0 text-xs text-sky-100">{pacientesFiltrados.length} encontrados · Seleccione una tarjeta para ver su historial</p>
+                <p className="m-0 text-xs text-sky-100">{pacientesFiltrados.length} encontrados · Busque por nombre o DNI, o filtre por la inicial del primer nombre</p>
               </div>
-              <div className="p-4 flex gap-3 overflow-x-auto">
+              <div className="flex flex-wrap gap-1.5 p-4 pb-0" aria-label="Filtrar por inicial del primer nombre">
+                <button type="button" onClick={() => setLetraNombre('')} aria-pressed={!letraNombre} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${!letraNombre ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-teal-50'}`}>Todos</button>
+                {'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ'.split('').map(letra => <button key={letra} type="button" onClick={() => setLetraNombre(letraNombre === letra ? '' : letra)} aria-pressed={letraNombre === letra} className={`w-8 h-8 rounded-lg text-xs font-bold ${letraNombre === letra ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-teal-50'}`}>{letra}</button>)}
+              </div>
+              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[440px] overflow-y-auto">
                 {loading ? (
                   <p className="text-center py-5 text-slate-500 text-xs">Cargando lista unificada...</p>
                 ) : pacientesFiltrados.length === 0 ? (
-                  <p className="text-center py-8 text-slate-400 text-xs">Sin resultados.</p>
+                  <p className="text-center py-8 text-slate-500 text-xs col-span-full">No se encontró un paciente con ese nombre o DNI. Pruebe con otra letra o pulse «Todos».</p>
                 ) : (
                   pacientesFiltrados.map((p) => {
                     const isSelected = pacienteSeleccionado?.id === p.id;
                     return (
-                      <div
-                        key={p.id}
+                      <button
+                        key={p.dni_paciente}
+                        type="button"
                         onClick={() => handleSeleccionarPaciente(p)}
-                        className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col gap-2 min-w-[235px] w-[260px] shrink-0 ${
+                        aria-pressed={isSelected}
+                        className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col gap-2 w-full text-left ${
                           isSelected 
                             ? 'border-teal-500 bg-teal-50 shadow-md ring-2 ring-teal-100' 
                             : 'border-sky-100 bg-sky-50/40 hover:border-teal-300 hover:bg-teal-50/50'
@@ -660,7 +685,7 @@ function VitaminasPageContent() {
                             ⏳ Pendiente de asignación
                           </span>
                         )}
-                      </div>
+                      </button>
                     );
                   })
                 )}
