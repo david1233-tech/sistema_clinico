@@ -19,6 +19,17 @@ export default function TriajeVitaminasImagenes({ dni }: { dni: string }) {
   const [fechaEditada, setFechaEditada] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [mensaje, setMensaje] = useState('');
+  const [imagenAbierta, setImagenAbierta] = useState<Imagen | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const cerrarRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!imagenAbierta) return;
+    cerrarRef.current?.focus();
+    const cerrarConEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setImagenAbierta(null); };
+    window.addEventListener('keydown', cerrarConEscape);
+    return () => window.removeEventListener('keydown', cerrarConEscape);
+  }, [imagenAbierta]);
 
   useEffect(() => {
     if (!/^\d{8}$/.test(dni)) return;
@@ -105,13 +116,25 @@ export default function TriajeVitaminasImagenes({ dni }: { dni: string }) {
     {mensaje && <p role="status" className="text-xs text-slate-700 m-0">{mensaje}</p>}
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
       {imagenes.map(item => <article key={item.id} className="rounded-xl border border-slate-200 p-3 flex flex-col gap-2 min-w-0">
-        <a href={`/api/triaje/vitaminas-imagenes/${item.id}`} target="_blank" rel="noreferrer"><img src={`/api/triaje/vitaminas-imagenes/${item.id}`} alt={item.nombre} className="w-full h-36 object-contain bg-slate-50 rounded-lg" /></a>
+        <button type="button" onClick={() => { setImagenAbierta(item); setZoom(1); }} aria-label={`Abrir imagen ${item.nombre}`} className="cursor-zoom-in"><img src={`/api/triaje/vitaminas-imagenes/${item.id}`} alt={item.nombre} className="w-full h-36 object-contain bg-slate-50 rounded-lg" /></button>
         <strong className="text-xs truncate" title={item.nombre}>{item.nombre}</strong>
         <span className="text-xs text-slate-600">Subida: {new Date(item.fecha_subida).toLocaleString('es-PE')}</span>
         {editando === String(item.id) ? <div className="flex flex-wrap gap-2"><input type="datetime-local" value={fechaEditada} onChange={event => setFechaEditada(event.target.value)} className="border border-slate-300 rounded-lg p-1 text-xs" /><button disabled={ocupado} onClick={() => guardarFecha(String(item.id))} className="text-violet-700 text-xs font-bold">Guardar fecha</button><button onClick={() => setEditando(null)} className="text-xs">Cancelar</button></div> : <span className="text-xs text-slate-700">Aplicación: {new Date(item.fecha_aplicacion).toLocaleString('es-PE')}</span>}
         <div className="flex gap-3"><button onClick={() => { setEditando(String(item.id)); setFechaEditada(localDateTime(item.fecha_aplicacion)); }} className="text-violet-700 text-xs font-bold">Editar fecha</button><button disabled={ocupado} onClick={() => eliminar(String(item.id))} className="text-rose-700 text-xs font-bold">Eliminar</button></div>
       </article>)}
     </div>
+    {imagenAbierta && <div role="dialog" aria-modal="true" aria-label={`Imagen ${imagenAbierta.nombre}`} className="fixed inset-0 z-50 flex flex-col bg-slate-950/95 text-white" onClick={event => { if (event.target === event.currentTarget) setImagenAbierta(null); }}>
+      <div className="flex items-center gap-3 p-3 sm:p-4 border-b border-white/20">
+        <span className="min-w-0 flex-1 truncate text-sm font-bold">{imagenAbierta.nombre}</span>
+        <button type="button" onClick={() => setZoom(value => Math.max(1, Number((value - 0.5).toFixed(1))))} disabled={zoom <= 1} aria-label="Alejar imagen" className="rounded-lg border border-white/40 px-3 py-1 text-lg disabled:opacity-40">−</button>
+        <span className="text-xs w-12 text-center">{Math.round(zoom * 100)}%</span>
+        <button type="button" onClick={() => setZoom(value => Math.min(4, Number((value + 0.5).toFixed(1))))} disabled={zoom >= 4} aria-label="Acercar imagen" className="rounded-lg border border-white/40 px-3 py-1 text-lg disabled:opacity-40">+</button>
+        <button ref={cerrarRef} type="button" onClick={() => setImagenAbierta(null)} aria-label="Cerrar imagen y volver" className="rounded-lg bg-white text-slate-950 px-3 py-1 text-xl font-bold">×</button>
+      </div>
+      <div className="flex-1 overflow-auto p-3 sm:p-6 text-center">
+        <img src={`/api/triaje/vitaminas-imagenes/${imagenAbierta.id}`} alt={imagenAbierta.nombre} className="block mx-auto h-auto object-contain" style={{ width: `${zoom * 100}%`, maxWidth: zoom === 1 ? '100%' : 'none', maxHeight: zoom === 1 ? 'calc(100vh - 110px)' : 'none' }} />
+      </div>
+    </div>}
   </section>;
 }
 
