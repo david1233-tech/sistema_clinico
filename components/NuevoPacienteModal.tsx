@@ -82,11 +82,13 @@ export default function NuevoPacienteModal() {
       });
       const data = await res.json();
       if (res.ok) {
+        localStorage.setItem('paciente_activo_vital_salud', JSON.stringify({ dni: data.dni, nombre: formData.nombre }));
+        window.dispatchEvent(new Event('paciente_activo_changed'));
         setOpen(false);
         setFormData(formularioVacio);
         setMensaje(null);
         dniActual.current = '';
-        router.push(`/recepcion?dni=${encodeURIComponent(data.dni)}`);
+        router.push(`/triaje?dni=${encodeURIComponent(data.dni)}`);
 
       } else {
         setMensaje({ tipo: 'error', texto: data.error || 'Ocurrió un error' });
@@ -266,3 +268,4 @@ export default function NuevoPacienteModal() {
     </>
   );
 }
+

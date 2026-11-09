@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import NuevoPacienteModal from '@/components/NuevoPacienteModal';
 import BotonSeleccionarPaciente from '@/components/BotonSeleccionarPaciente';
+import { primerApellido } from '@/lib/busqueda-pacientes';
 
 type EdicionPaciente = {
   dni: string;
@@ -23,11 +24,6 @@ type PacienteRecepcion = Partial<EdicionPaciente> & {
 };
 
 const normalizarBusqueda = (texto: string) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-
-const primerApellido = (nombre: string) => {
-  const partes = nombre.trim().split(/\s+/).filter(Boolean);
-  return partes.length >= 3 ? partes[partes.length - 2] : partes[partes.length - 1] || '';
-};
 
 function RecepcionPageContent() {
   const searchParams = useSearchParams();
@@ -418,6 +414,7 @@ function RecepcionPageContent() {
                     <span>🖨️</span> Imprimir Historial Clínico (Opción 3)
                   </button>
                   <BotonSeleccionarPaciente dni={paciente.dni || paciente.dni_paciente} nombre={paciente.nombre} />
+                  <a href={`/triaje?dni=${encodeURIComponent(paciente.dni || paciente.dni_paciente)}`} className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-extrabold text-xs no-underline">🩺 Ir a Triaje</a>
                 </div>
               </div>
 
@@ -619,7 +616,7 @@ function RecepcionPageContent() {
                   Padrón Activo
                 </div>
                 <h3 className="m-0 text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
-                  Todos los pacientes registrados ({pacientesRegistrados.length}) · por apellido A-Z
+                  Pacientes registrados ({pacientesRegistrados.length}) · por apellido A-Z
                 </h3>
                 </div>
                 <input
@@ -640,73 +637,21 @@ function RecepcionPageContent() {
                   No hay pacientes que coincidan con la búsqueda.
                 </div>
               ) : (
-                <div className="overflow-x-auto w-full">
-                  <table className="w-full border-separate border-spacing-y-2 text-xs sm:text-sm text-left min-w-[700px]">
-                    <thead>
-                      <tr className="text-slate-400 font-extrabold text-[11px] tracking-wider uppercase">
-                        <th className="px-4 py-3">PACIENTE</th>
-                        <th className="px-4 py-3">DNI</th>
-                        <th className="px-4 py-3">TELÉFONO</th>
-                        <th className="px-4 py-3">DIRECCIÓN</th>
-                        <th className="px-4 py-3 text-right">ACCIONES</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pacientesVisibles.map((p) => (
-                        <tr key={p.id || p.dni || p.dni_paciente} className="bg-white border border-slate-200 shadow-sm hover:bg-slate-50 transition-all">
-                          <td className="px-4 py-3 font-bold text-slate-900 rounded-l-xl border-l-4 border-teal-600 border-t border-b border-slate-200">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-lg bg-emerald-50 text-teal-600 border border-emerald-200 flex items-center justify-center font-extrabold text-sm shrink-0">
-                                {p.nombre ? p.nombre.charAt(0).toUpperCase() : 'P'}
-                              </div>
-                              <a 
-                                href={`/recepcion?dni=${p.dni || p.dni_paciente}`} 
-                                className="whitespace-nowrap font-bold text-xs sm:text-sm text-slate-900 hover:text-sky-600 no-underline"
-                              >
-                                {p.nombre}
-                              </a>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-slate-700 font-bold border-t border-b border-slate-200">
-                            <span className="bg-slate-100 px-2.5 py-1 rounded-md font-mono text-xs">{p.dni || p.dni_paciente}</span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-500 font-semibold border-t border-b border-slate-200 whitespace-nowrap">
-                            {p.telefono || 'Sin teléfono'}
-                          </td>
-                          <td className="px-4 py-3 text-slate-500 font-semibold border-t border-b border-slate-200 max-w-[180px] truncate">
-                            {p.direccion || 'Sin dirección'}
-                          </td>
-                          <td className="px-4 py-3 text-right rounded-r-xl border-r border-t border-b border-slate-200">
-                            <div className="flex items-center justify-end gap-2">
-                              <BotonSeleccionarPaciente dni={p.dni} nombre={p.nombre} />
-                              <button
-                                type="button"
-                                onClick={() => iniciarEdicionPaciente(p)}
-                                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl font-extrabold text-xs cursor-pointer"
-                              >
-                                ✏️ Editar
-                              </button>
-                              <a
-                                href={`/recepcion?dni=${p.dni || p.dni_paciente}`}
-                                className="px-3 py-2 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-xl font-extrabold text-xs no-underline transition-all inline-flex items-center gap-1"
-                                title="Ver expediente completo"
-                              >
-                                <span>📄</span> Ver Expediente
-                              </a>
-                              <button
-                                type="button"
-                                onClick={() => handleEliminarPaciente(p)}
-                                className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 p-2 rounded-xl font-extrabold text-xs cursor-pointer transition-all"
-                                title="Eliminar Paciente"
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {pacientesVisibles.map((p) => <article key={p.id || p.dni || p.dni_paciente} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 flex flex-col gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center font-extrabold shrink-0">{p.nombre?.charAt(0).toUpperCase() || 'P'}</div>
+                      <div className="min-w-0"><a href={`/recepcion?dni=${p.dni || p.dni_paciente}`} className="font-extrabold text-slate-900 hover:text-sky-700 no-underline break-words">{p.nombre}</a><p className="text-xs text-slate-500 m-0">DNI {p.dni || p.dni_paciente}</p></div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600"><span>☎ {p.telefono || 'Sin teléfono'}</span><span className="break-words">⌖ {p.direccion || 'Sin dirección'}</span></div>
+                    <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
+                      <BotonSeleccionarPaciente dni={p.dni || p.dni_paciente || ''} nombre={p.nombre} />
+                      <a href={`/recepcion?dni=${p.dni || p.dni_paciente}`} className="px-3 py-2 bg-sky-50 text-sky-700 border border-sky-200 rounded-xl font-extrabold text-xs no-underline">📄 Expediente</a>
+                      <a href={`/triaje?dni=${p.dni || p.dni_paciente}`} className="px-3 py-2 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl font-extrabold text-xs no-underline">🩺 Triaje</a>
+                      <button type="button" onClick={() => iniciarEdicionPaciente(p)} className="px-3 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl font-extrabold text-xs">✏️ Editar</button>
+                      <button type="button" onClick={() => handleEliminarPaciente(p)} className="px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-extrabold text-xs" aria-label={`Eliminar ${p.nombre}`}>🗑️</button>
+                    </div>
+                  </article>)}
                 </div>
               )}
             </div>
@@ -911,3 +856,4 @@ export default function RecepcionPage() {
     </Suspense>
   );
 }
+

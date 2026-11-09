@@ -8,7 +8,7 @@ interface SelectorProps {
   label?: string;
 }
 
-export default function SelectorPaciente({ onSelectPaciente, label = "Seleccionar Paciente (Registrado en Recepción)" }: SelectorProps) {
+export default function SelectorPaciente({ valSeleccionado, onSelectPaciente, label = "Seleccionar Paciente (Registrado en Recepción)" }: SelectorProps) {
   const [pacientes, setPacientes] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -22,6 +22,12 @@ export default function SelectorPaciente({ onSelectPaciente, label = "Selecciona
       .catch((err) => console.error('Error cargando pacientes:', err))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!valSeleccionado || !pacientes.length) return;
+    const encontrado = pacientes.find(p => p.dni === valSeleccionado);
+    if (encontrado) onSelectPaciente(encontrado);
+  }, [valSeleccionado, pacientes]);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const dniElegido = e.target.value;
@@ -39,6 +45,7 @@ export default function SelectorPaciente({ onSelectPaciente, label = "Selecciona
         {label} *
       </label>
       <select
+        value={valSeleccionado || ''}
         onChange={handleChange}
         className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-bold text-slate-900 text-xs sm:text-sm outline-none focus:border-teal-600 shadow-sm cursor-pointer"
         required
@@ -53,3 +60,4 @@ export default function SelectorPaciente({ onSelectPaciente, label = "Selecciona
     </div>
   );
 }
+

@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { pgPool } from '@/lib/db';
 import { ensureVitaminasAdjuntos } from '@/lib/vitaminas-adjuntos';
 
-const MAX_ADJUNTOS = 200;
 const MAX_BYTES = 3 * 1024 * 1024;
 const TIPOS = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']);
 
@@ -35,11 +34,6 @@ export async function POST(request: Request) {
         await client.query('ROLLBACK');
         return NextResponse.json({ error: 'Tratamiento no encontrado' }, { status: 404 });
       }
-      const count = await client.query('SELECT COUNT(*)::int AS total FROM vitaminas_adjuntos WHERE receta_id = $1', [id]);
-      if (count.rows[0].total >= MAX_ADJUNTOS) {
-        await client.query('ROLLBACK');
-        return NextResponse.json({ error: 'Máximo 200 adjuntos por tratamiento' }, { status: 400 });
-      }
       const saved = await client.query('INSERT INTO vitaminas_adjuntos (receta_id, nombre, tipo, contenido) VALUES ($1,$2,$3,$4) RETURNING id, nombre, tipo, fecha', [id, archivo.name.slice(0, 255), archivo.type, Buffer.from(await archivo.arrayBuffer())]);
       await client.query('COMMIT');
       return NextResponse.json(saved.rows[0]);
@@ -65,3 +59,4 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'No se pudo eliminar el adjunto' }, { status: 500 });
   }
 }
+

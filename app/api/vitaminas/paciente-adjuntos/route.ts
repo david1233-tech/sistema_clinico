@@ -3,7 +3,6 @@ import { pgPool } from '@/lib/db';
 import { ensureVitaminasAdjuntos } from '@/lib/vitaminas-adjuntos';
 import { ensureVitaminasPacienteAdjuntos } from '@/lib/vitaminas-paciente-adjuntos';
 
-const MAX_ARCHIVOS = 200;
 const MAX_BYTES = 3 * 1024 * 1024;
 const TIPOS = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']);
 
@@ -43,11 +42,6 @@ export async function POST(request: Request) {
         await client.query('ROLLBACK');
         return NextResponse.json({ error: 'Paciente no encontrado' }, { status: 404 });
       }
-      const count = await client.query('SELECT COUNT(*)::int AS total FROM vitaminas_paciente_adjuntos WHERE dni_paciente = $1', [dni]);
-      if (count.rows[0].total >= MAX_ARCHIVOS) {
-        await client.query('ROLLBACK');
-        return NextResponse.json({ error: 'Máximo 200 archivos por paciente' }, { status: 400 });
-      }
       const result = await client.query('INSERT INTO vitaminas_paciente_adjuntos (dni_paciente, nombre, tipo, contenido) VALUES ($1,$2,$3,$4) RETURNING id, nombre, tipo, fecha', [dni, archivo.name.slice(0, 255), archivo.type, Buffer.from(await archivo.arrayBuffer())]);
       await client.query('COMMIT');
       return NextResponse.json({ ...result.rows[0], origen: 'paciente' });
@@ -73,3 +67,4 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'No se pudo eliminar el archivo' }, { status: 500 });
   }
 }
+

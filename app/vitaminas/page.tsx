@@ -30,7 +30,6 @@ interface Tratamiento {
 }
 
 interface AdjuntoVitamina { id: number; nombre: string; tipo: string; fecha: string; origen: 'paciente' | 'tratamiento' }
-const MAX_ADJUNTOS_VITAMINA = 200;
 const TIPOS_ADJUNTOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
 
 interface VitaminaAdicional {
@@ -453,7 +452,6 @@ function VitaminasPageContent() {
     event.target.value = '';
     const dni = pacienteSeleccionado?.dni_paciente;
     if (!dni || !archivos.length || cargandoAdjuntos) return;
-    if (adjuntos.filter(item => item.origen === 'paciente').length + archivos.length > MAX_ADJUNTOS_VITAMINA) return alert('Se permiten hasta 200 archivos por paciente.');
     if (archivos.some(file => !TIPOS_ADJUNTOS.includes(file.type) || !file.size || file.size > 3 * 1024 * 1024)) return alert('Solo imágenes JPG, PNG, WebP, GIF o PDF de hasta 3 MB por archivo.');
     setSubiendoAdjuntos(true);
     try {
@@ -697,15 +695,15 @@ function VitaminasPageContent() {
                       <div>
                         <span className="text-[11px] uppercase tracking-wider font-extrabold text-teal-700">Documentación del paciente</span>
                         <h3 className="m-0 mt-1 text-base font-black text-slate-900">Fotos y archivos · {adjuntos.length} guardados</h3>
-                        <p className="m-0 mt-1 text-xs text-slate-500">Puede subirlos ahora, antes de registrar vitaminas o sueros. Admite 200 archivos nuevos por paciente y conserva los adjuntos anteriores.</p>
+                        <p className="m-0 mt-1 text-xs text-slate-500">Puede subirlos ahora, antes de registrar vitaminas o sueros. Conserva los adjuntos anteriores.</p>
                       </div>
                       <button type="button" onClick={() => setGaleriaAbierta(true)} className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-xs font-extrabold text-teal-900 hover:bg-teal-100">Ver archivos</button>
                     </div>
                     <label className="mt-4 flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-teal-300 bg-teal-50/60 p-4 text-sm font-extrabold text-teal-900 transition-colors hover:bg-teal-100">
                       ＋ Agregar imágenes o PDF
-                      <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={subirAdjuntos} disabled={subiendoAdjuntos || cargandoAdjuntos || adjuntosPacienteCount >= MAX_ADJUNTOS_VITAMINA} className="sr-only" />
+                      <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={subirAdjuntos} disabled={subiendoAdjuntos || cargandoAdjuntos} className="sr-only" />
                     </label>
-                    <p className="m-0 mt-2 text-xs text-slate-500">{adjuntosPacienteCount}/200 archivos nuevos · Hasta 3 MB por archivo.</p>
+                    <p className="m-0 mt-2 text-xs text-slate-500">{adjuntosPacienteCount} archivos nuevos · Hasta 3 MB por archivo.</p>
                     {avanceAdjuntos && <p role="status" className="m-0 mt-2 text-xs font-bold text-teal-800">{avanceAdjuntos}</p>}
                   </section>
 
@@ -903,9 +901,9 @@ function VitaminasPageContent() {
                       <button type="button" onClick={() => setGaleriaAbierta(false)} disabled={subiendoAdjuntos} aria-label="Cerrar archivos" className="text-slate-600 font-bold disabled:opacity-50">✕</button>
                     </div>
                     <label className="block mt-3 rounded-xl border-2 border-dashed border-teal-300 bg-teal-50 p-4 text-center text-sm font-bold text-teal-900 cursor-pointer">＋ Agregar imágenes o PDF
-                      <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={subirAdjuntos} disabled={subiendoAdjuntos || cargandoAdjuntos || adjuntosPacienteCount >= MAX_ADJUNTOS_VITAMINA} className="sr-only" />
+                      <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={subirAdjuntos} disabled={subiendoAdjuntos || cargandoAdjuntos} className="sr-only" />
                     </label>
-                    <p className="text-xs text-slate-500">Hasta 200 archivos nuevos de 3 MB cada uno por paciente. Los adjuntos de tratamientos anteriores permanecen aquí.</p>
+                    <p className="text-xs text-slate-500">Hasta 3 MB por archivo. Los adjuntos de tratamientos anteriores permanecen aquí.</p>
                     {avanceAdjuntos && <p role="status" className="text-xs font-bold text-teal-800">{avanceAdjuntos}</p>}
                     <div className="mt-4 grid gap-2 sm:grid-cols-2">
                       {adjuntos.map(item => <div key={`${item.origen}-${item.id}`} className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs min-w-0">
@@ -932,3 +930,4 @@ export default function VitaminasPage() {
     </Suspense>
   );
 }
+
