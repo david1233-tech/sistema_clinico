@@ -170,6 +170,7 @@ function VitaminasPageContent() {
   const [busqueda, setBusqueda] = useState<string>('');
   const [busquedaVitamina, setBusquedaVitamina] = useState('');
   const [mostrarCatalogo, setMostrarCatalogo] = useState(false);
+  const catalogoRef = useRef<HTMLDivElement>(null);
   const [viaOpcion, setViaOpcion] = useState('');
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -192,6 +193,21 @@ function VitaminasPageContent() {
 
   useEffect(() => {
     fetchPacientesTodos();
+  }, []);
+
+  useEffect(() => {
+    const cerrarFuera = (event: PointerEvent) => {
+      if (catalogoRef.current && !catalogoRef.current.contains(event.target as Node)) setMostrarCatalogo(false);
+    };
+    const cerrarEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMostrarCatalogo(false);
+    };
+    document.addEventListener('pointerdown', cerrarFuera);
+    document.addEventListener('keydown', cerrarEscape);
+    return () => {
+      document.removeEventListener('pointerdown', cerrarFuera);
+      document.removeEventListener('keydown', cerrarEscape);
+    };
   }, []);
 
   useEffect(() => {
@@ -517,7 +533,7 @@ function VitaminasPageContent() {
   const tratamientosPaciente = tratamientos.filter(t => t.dni_paciente === pacienteSeleccionado?.dni_paciente);
   const sesionesPaciente = agruparSesiones(tratamientosPaciente);
   const adjuntosPacienteCount = adjuntos.filter(item => item.origen === 'paciente').length;
-  const opcionesVitamina = CATALOGO_VITAMINAS.filter(nombre => normalizarBusqueda(nombre).startsWith(normalizarBusqueda(busquedaVitamina)));
+  const opcionesVitamina = busquedaVitamina.trim() ? CATALOGO_VITAMINAS.filter(nombre => normalizarBusqueda(nombre).includes(normalizarBusqueda(busquedaVitamina))).slice(0, 12) : [];
 
   return (
     <div className="module-shell flex min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50 font-sans text-slate-900">
@@ -712,13 +728,15 @@ function VitaminasPageContent() {
                       <span className="text-2xl">🧪</span>
                       <div>
                         <h3 className="m-0 text-sm md:text-base font-extrabold text-white">{registroEditando ? 'Editar vitamina o suero guardado' : 'Especificación de Vitaminas e Inyectables'}</h3>
-                        <p className="m-0 text-xs text-teal-100">{registroEditando ? 'Los cambios se aplicarán solo a este registro.' : 'Rellene manualmente los datos de la dosis aplicada al paciente'}</p>
+                        <p className="m-0 text-xs text-teal-100">{registroEditando ? 'Los cambios se aplicarán solo a este registro.' : 'Elija o escriba el producto; después complete los datos de aplicación.'}</p>
                       </div>
                     </div>
+                    <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-4 flex flex-col gap-3">
+                      <div><span className="text-[11px] font-extrabold text-sky-800 uppercase">1 · Producto aplicado</span><p className="text-xs text-slate-600 m-0 mt-1">Puede buscar en el catálogo o escribir directamente el nombre. Si agrega varios, compartirán la dosis, vía y observaciones.</p></div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
-                          NOMBRE / TIPO DE VITAMINA O SUERO *
+                          VITAMINA, INYECTABLE O SUERO *
                         </label>
                         <input
                           type="text"
@@ -729,9 +747,9 @@ function VitaminasPageContent() {
                           className="w-full p-3 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600 focus:bg-white"
                         />
                       </div>
-                      <div className="relative">
+                      <div ref={catalogoRef} className="relative">
                         <label htmlFor="buscar-vitamina" className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
-                          BUSCAR Y AÑADIR VITAMINAS O SUEROS
+                          BUSCAR EN EL CATÁLOGO (OPCIONAL)
                         </label>
                         <input
                           id="buscar-vitamina"
@@ -739,16 +757,17 @@ function VitaminasPageContent() {
                           autoComplete="off"
                           value={busquedaVitamina}
                           onChange={(e) => { setBusquedaVitamina(e.target.value); setMostrarCatalogo(true); }}
-                          onFocus={() => setMostrarCatalogo(true)}
-                          placeholder="Escriba las primeras letras..."
+                          onFocus={() => setMostrarCatalogo(Boolean(busquedaVitamina.trim()))}
+                          placeholder="Buscar por nombre; pulse Esc para cerrar"
                           className="w-full p-3 rounded-xl border border-slate-300 bg-white font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600"
                           role="combobox"
                           aria-autocomplete="list"
                           aria-controls="opciones-vitaminas"
-                          aria-expanded={mostrarCatalogo}
+                          aria-expanded={mostrarCatalogo && Boolean(busquedaVitamina.trim())}
                         />
-                        {mostrarCatalogo && (
+                        {mostrarCatalogo && Boolean(busquedaVitamina.trim()) && (
                           <div id="opciones-vitaminas" className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-300 bg-white shadow-lg">
+                            <div className="sticky top-0 bg-slate-50 border-b border-slate-200 px-3 py-2 flex items-center justify-between gap-2"><span className="text-[11px] text-slate-600">Seleccione un producto o cierre la búsqueda</span><button type="button" onClick={() => setMostrarCatalogo(false)} className="text-xs font-bold text-teal-800">Cerrar ✕</button></div>
                             {opcionesVitamina.length > 0 ? opcionesVitamina.map(nombre => (
                               <button
                                 key={nombre}
@@ -772,10 +791,10 @@ function VitaminasPageContent() {
                         <div className="mt-2 flex flex-wrap gap-2">
                           {vitaminasAdicionales.map(item => <span key={item.id} className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200 px-3 py-1 text-xs font-bold text-teal-900">{item.vitaminaNombre}<button type="button" onClick={() => setVitaminasAdicionales(prev => prev.filter(v => v.id !== item.id))} aria-label={`Quitar ${item.vitaminaNombre}`} className="text-rose-700">✕</button></span>)}
                         </div>
-                        {vitaminasAdicionales.length > 0 && <p className="text-[11px] text-teal-800 m-0 mt-1">Todas las vitaminas elegidas usarán la dosis, vía y observaciones de este formulario.</p>}
+                        {vitaminasAdicionales.length > 0 && <p className="text-[11px] text-teal-800 m-0 mt-1">{1 + vitaminasAdicionales.length} productos en esta aplicación. Todos usarán la dosis, vía y observaciones de abajo.</p>}
                         <button type="button" onClick={handleAgregarVitamina} disabled={!busquedaVitamina.trim() || vitaminasAdicionales.length >= 49} className="mt-2 text-xs font-bold text-teal-700 disabled:opacity-40">＋ Agregar lo escrito</button>
                       </div>
-                      <div>
+                      <div className="md:col-span-2">
                         <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
                           DOSIS / CANTIDAD *
                         </label>
@@ -789,6 +808,9 @@ function VitaminasPageContent() {
                         />
                       </div>
                     </div>
+                    </div>
+                    <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-4 flex flex-col gap-4">
+                      <div><span className="text-[11px] font-extrabold text-teal-800 uppercase">2 · Datos de aplicación</span><p className="text-xs text-slate-600 m-0 mt-1">Indique la vía y agregue observaciones si corresponde.</p></div>
                     <div>
                       <label htmlFor="via-vitamina" className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
                         VÍA DE ADMINISTRACIÓN
@@ -833,6 +855,7 @@ function VitaminasPageContent() {
                         placeholder="Detalles del procedimiento o tolerancia del paciente..."
                         className="w-full p-3 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600 focus:bg-white resize-y"
                       />
+                    </div>
                     </div>
                     <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
                       <button
