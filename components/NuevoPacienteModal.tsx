@@ -88,7 +88,7 @@ export default function NuevoPacienteModal() {
         setFormData(formularioVacio);
         setMensaje(null);
         dniActual.current = '';
-        router.push(`/triaje?dni=${encodeURIComponent(data.dni)}`);
+        router.push(`/enfermeria?dni=${encodeURIComponent(data.dni)}`);
 
       } else {
         setMensaje({ tipo: 'error', texto: data.error || 'Ocurrió un error' });

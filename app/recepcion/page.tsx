@@ -414,7 +414,7 @@ function RecepcionPageContent() {
                     <span>🖨️</span> Imprimir Historial Clínico (Opción 3)
                   </button>
                   <BotonSeleccionarPaciente dni={paciente.dni || paciente.dni_paciente} nombre={paciente.nombre} />
-                  <a href={`/triaje?dni=${encodeURIComponent(paciente.dni || paciente.dni_paciente)}`} className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-extrabold text-xs no-underline">🩺 Ir a Triaje</a>
+                  <a href={`/enfermeria?dni=${encodeURIComponent(paciente.dni || paciente.dni_paciente)}`} className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-extrabold text-xs no-underline">🩺 Ir a Triaje</a>
                 </div>
               </div>
 
@@ -647,7 +647,7 @@ function RecepcionPageContent() {
                     <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
                       <BotonSeleccionarPaciente dni={p.dni || p.dni_paciente || ''} nombre={p.nombre} />
                       <a href={`/recepcion?dni=${p.dni || p.dni_paciente}`} className="px-3 py-2 bg-sky-50 text-sky-700 border border-sky-200 rounded-xl font-extrabold text-xs no-underline">📄 Expediente</a>
-                      <a href={`/triaje?dni=${p.dni || p.dni_paciente}`} className="px-3 py-2 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl font-extrabold text-xs no-underline">🩺 Triaje</a>
+                      <a href={`/enfermeria?dni=${p.dni || p.dni_paciente}`} className="px-3 py-2 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl font-extrabold text-xs no-underline">🩺 Triaje</a>
                       <button type="button" onClick={() => iniciarEdicionPaciente(p)} className="px-3 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl font-extrabold text-xs">✏️ Editar</button>
                       <button type="button" onClick={() => handleEliminarPaciente(p)} className="px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-extrabold text-xs" aria-label={`Eliminar ${p.nombre}`}>🗑️</button>
                     </div>

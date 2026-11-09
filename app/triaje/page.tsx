@@ -3,10 +3,6 @@
 import { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import SelectorPaciente from '@/components/SelectorPaciente';
-import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
-import TriajeVitaminasImagenes from '@/components/TriajeVitaminasImagenes';
-import TriajeImagenes from '@/components/TriajeImagenes';
 
 interface Triaje {
   id: number | string;
@@ -22,8 +18,7 @@ interface Triaje {
   fecha?: string;
 }
 
-function TriajePageContent() {
-  const dniInicial = useSearchParams().get('dni') || '';
+export default function TriajePage() {
   const [triajes, setTriajes] = useState<Triaje[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
@@ -141,7 +136,7 @@ function TriajePageContent() {
               <form onSubmit={handleSubmit} className="flex flex-col gap-3">
                 
                 {/* SELECTOR AUTOMÁTICO DE PACIENTES */}
-                <SelectorPaciente valSeleccionado={form.dni_paciente || dniInicial} onSelectPaciente={handleSeleccionarPaciente} />
+                <SelectorPaciente onSelectPaciente={handleSeleccionarPaciente} />
 
                 {form.nombre_paciente && (
                   <div className="p-2.5 bg-teal-50 rounded-xl border border-teal-200 text-xs text-teal-800 font-bold">
@@ -244,12 +239,12 @@ function TriajePageContent() {
               ) : (
                 <div className="flex flex-col gap-2 max-h-[500px] overflow-y-auto">
                   {triajes.map((t) => (
-                    <div key={t.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col gap-2 text-xs">
-                      <div className="flex justify-between items-center"><div>
+                    <div key={t.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
+                      <div>
                         <strong className="text-slate-900 block">{t.nombre_paciente || `DNI: ${t.dni_paciente}`}</strong>
                         <span className="text-slate-500">Temp: {t.temperatura}°C • P.A: {t.presion}</span>
-                      </div><span className="bg-teal-100 text-teal-800 px-2 py-1 rounded font-bold text-[10px]">Registrado</span></div>
-                      <TriajeImagenes triajeId={String(t.id)} />
+                      </div>
+                      <span className="bg-teal-100 text-teal-800 px-2 py-1 rounded font-bold text-[10px]">Registrado</span>
                     </div>
                   ))}
                 </div>
@@ -257,14 +252,9 @@ function TriajePageContent() {
             </div>
 
           </div>
-          <TriajeVitaminasImagenes dni={form.dni_paciente} />
         </main>
       </div>
     </div>
   );
-}
-
-export default function TriajePage() {
-  return <Suspense fallback={null}><TriajePageContent /></Suspense>;
 }
 
