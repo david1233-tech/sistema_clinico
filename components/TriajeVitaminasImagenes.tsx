@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Imagen = { id: string; nombre: string; fecha_subida: string; fecha_aplicacion: string };
+type Pendiente = { id: number; archivo: File; fecha: string };
 const localDateTime = (value: string | Date) => {
   const date = new Date(value);
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -10,8 +11,10 @@ const localDateTime = (value: string | Date) => {
 
 export default function TriajeVitaminasImagenes({ dni }: { dni: string }) {
   const [imagenes, setImagenes] = useState<Imagen[]>([]);
-  const [archivos, setArchivos] = useState<File[]>([]);
+  const [archivos, setArchivos] = useState<Pendiente[]>([]);
   const [fecha, setFecha] = useState(() => localDateTime(new Date()));
+  const camaraRef = useRef<HTMLInputElement>(null);
+  const siguienteId = useRef(0);
   const [editando, setEditando] = useState<string | null>(null);
   const [fechaEditada, setFechaEditada] = useState('');
   const [ocupado, setOcupado] = useState(false);
@@ -27,33 +30,41 @@ export default function TriajeVitaminasImagenes({ dni }: { dni: string }) {
     return () => { vigente = false; };
   }, [dni]);
 
-  const subir = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!archivos.length || !dni) return;
-    if (imagenes.length + archivos.length > 200) { setMensaje('Máximo 200 imágenes de vitaminas por paciente'); return; }
+  const guardarArchivos = async (pendientes: Pendiente[], esCamara = false) => {
+    if (!pendientes.length || !dni) return;
+    if (imagenes.length + pendientes.length > 200) { setMensaje('Máximo 200 imágenes de vitaminas por paciente'); return; }
     setOcupado(true); setMensaje('');
     let guardadas = 0;
     try {
-      const fechaAplicacion = new Date(fecha).toISOString();
-      for (const archivo of archivos) {
-        setMensaje(`Guardando ${guardadas + 1} de ${archivos.length}: ${archivo.name}`);
+      for (const pendiente of pendientes) {
+        const { archivo } = pendiente;
+        if (!pendiente.fecha || Number.isNaN(new Date(pendiente.fecha).getTime())) throw new Error(`Indique la fecha y hora de ${archivo.name}`);
+        setMensaje(`Guardando ${guardadas + 1} de ${pendientes.length}: ${archivo.name}`);
         const form = new FormData();
-        form.set('dni', dni); form.set('archivo', archivo); form.set('fecha_aplicacion', fechaAplicacion);
+        form.set('dni', dni); form.set('archivo', archivo); form.set('fecha_aplicacion', new Date(pendiente.fecha).toISOString());
         const response = await fetch('/api/triaje/vitaminas-imagenes', { method: 'POST', body: form });
         const data = await response.json();
         if (!response.ok) throw new Error(`${archivo.name}: ${data.error || 'No se pudo guardar'}`);
         setImagenes(prev => [data, ...prev]);
+        if (!esCamara) setArchivos(prev => prev.filter(item => item.id !== pendiente.id));
         guardadas++;
       }
-      setArchivos([]); setFecha(localDateTime(new Date()));
-      const input = document.getElementById('triaje-vitaminas-archivo') as HTMLInputElement | null;
-      if (input) input.value = '';
-      setMensaje(`${guardadas} imagen(es) guardada(s). Puede editar la fecha y hora de cada una por separado.`);
+      setMensaje(`${guardadas} imagen(es) guardada(s) con su fecha y hora de aplicación.`);
     } catch (error) {
-      if (guardadas) setArchivos(prev => prev.slice(guardadas));
       setMensaje(`${guardadas} imagen(es) guardada(s). ${error instanceof Error ? error.message : 'No se pudo continuar'}`);
     }
     finally { setOcupado(false); }
+  };
+
+  const subir = (event: React.FormEvent) => { event.preventDefault(); void guardarArchivos(archivos); };
+  const seleccionarArchivos = (files: FileList | null) => {
+    if (!files?.length) return;
+    setArchivos(prev => [...prev, ...Array.from(files, archivo => ({ id: ++siguienteId.current, archivo, fecha }))]);
+  };
+  const tomarFoto = async (files: FileList | null) => {
+    const archivo = files?.[0];
+    if (camaraRef.current) camaraRef.current.value = '';
+    if (archivo) await guardarArchivos([{ id: ++siguienteId.current, archivo, fecha }], true);
   };
 
   const guardarFecha = async (id: string) => {
@@ -79,12 +90,17 @@ export default function TriajeVitaminasImagenes({ dni }: { dni: string }) {
   };
 
   return <section className="bg-white rounded-2xl p-5 border border-violet-200 shadow-sm flex flex-col gap-4">
-    <div><h2 className="text-base font-extrabold m-0 text-slate-900">💉 Imágenes de vitaminas ({imagenes.length}/200)</h2><p className="text-xs text-slate-500 mt-1 mb-0">Seleccione varias fotos y guárdelas juntas. Después puede editar la fecha y hora de aplicación de cada imagen; la fecha de subida se registra automáticamente.</p></div>
+    <div><h2 className="text-base font-extrabold m-0 text-slate-900">💉 Imágenes de vitaminas ({imagenes.length}/200)</h2><p className="text-xs text-slate-500 mt-1 mb-0">Elija la fecha de aplicación antes de tomar una foto: se guardará automáticamente. Si selecciona varias imágenes, puede indicar una fecha diferente para cada una antes de guardarlas.</p></div>
     {!dni && <p className="text-sm text-amber-700">Seleccione un paciente para agregar o consultar sus imágenes.</p>}
-    <form onSubmit={subir} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
-      <label className="text-xs font-bold text-slate-700">Imágenes<input id="triaje-vitaminas-archivo" type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" required disabled={!dni || ocupado} onChange={event => setArchivos(Array.from(event.target.files || []))} className="block w-full mt-1 text-xs" />{archivos.length > 0 && <span className="block mt-1 text-violet-700">{archivos.length} imagen(es) seleccionada(s)</span>}</label>
+    <form onSubmit={subir} className="flex flex-col gap-3">
       <label className="text-xs font-bold text-slate-700">Fecha y hora de aplicación<input type="datetime-local" required value={fecha} onChange={event => setFecha(event.target.value)} disabled={!dni || ocupado} className="block w-full mt-1 p-2 rounded-lg border border-slate-300" /></label>
-      <button type="submit" disabled={!dni || ocupado || !archivos.length || imagenes.length + archivos.length > 200} className="bg-violet-600 text-white px-4 py-2 rounded-lg font-bold text-xs disabled:opacity-50">Guardar {archivos.length || ''} imagen(es)</button>
+      <div className="flex flex-wrap gap-2 items-center">
+        <button type="button" disabled={!dni || ocupado || !fecha || imagenes.length + archivos.length >= 200} onClick={() => camaraRef.current?.click()} className="bg-violet-600 text-white px-4 py-2 rounded-lg font-bold text-xs disabled:opacity-50">📷 Tomar foto y guardar</button>
+        <input ref={camaraRef} type="file" accept="image/*" capture="environment" onChange={event => void tomarFoto(event.target.files)} className="sr-only" aria-label="Tomar foto de vitamina" />
+        <label className="text-xs font-bold text-slate-700">Elegir imágenes<input type="file" multiple accept="image/*" disabled={!dni || ocupado} onChange={event => { seleccionarArchivos(event.target.files); event.target.value = ''; }} className="block w-full mt-1 text-xs" /></label>
+      </div>
+      {archivos.map(item => <div key={item.id} className="flex flex-wrap gap-2 items-center text-xs border border-slate-200 rounded-lg p-2"><span className="min-w-0 flex-1 truncate" title={item.archivo.name}>{item.archivo.name}</span><label>Fecha y hora<input type="datetime-local" required value={item.fecha} onChange={event => setArchivos(prev => prev.map(actual => actual.id === item.id ? { ...actual, fecha: event.target.value } : actual))} className="block border border-slate-300 rounded-lg p-1" /></label><button type="button" onClick={() => setArchivos(prev => prev.filter(actual => actual.id !== item.id))} className="text-rose-700 font-bold">Quitar</button></div>)}
+      {archivos.length > 0 && <button type="submit" disabled={!dni || ocupado || imagenes.length + archivos.length > 200} className="bg-violet-600 text-white px-4 py-2 rounded-lg font-bold text-xs disabled:opacity-50">Guardar {archivos.length} imagen(es)</button>}
     </form>
     {mensaje && <p role="status" className="text-xs text-slate-700 m-0">{mensaje}</p>}
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
