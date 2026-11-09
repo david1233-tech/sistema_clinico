@@ -392,7 +392,7 @@ function VitaminasPageContent() {
       via: tratamiento.via || '',
       observaciones: tratamiento.observaciones || ''
     });
-    setViaOpcion(['Endovenosa', 'Intramuscular'].includes(tratamiento.via) ? tratamiento.via : tratamiento.via ? 'Otra' : '');
+    setViaOpcion(['Endovenosa', 'Intravenosa', 'Intramuscular'].includes(tratamiento.via) ? tratamiento.via : tratamiento.via ? 'Otra' : '');
     setBusquedaVitamina('');
     setMostrarCatalogo(false);
     document.getElementById('formulario-vitamina')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -854,6 +854,7 @@ function VitaminasPageContent() {
                         >
                           <option value="">Seleccionar vía...</option>
                           <option value="Endovenosa">Endovenosa</option>
+                          <option value="Intravenosa">Intravenosa</option>
                           <option value="Intramuscular">Intramuscular</option>
                           <option value="Otra">Otra (escribir)</option>
                         </select>
