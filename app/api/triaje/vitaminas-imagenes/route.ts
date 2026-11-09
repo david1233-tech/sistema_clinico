@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { pgPool } from '@/lib/db';
 import { ensureTriajeVitaminasImagenes } from '@/lib/triaje-vitaminas-imagenes';
+import sharp from 'sharp';
 
-const tipos = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const tipos = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif', 'image/avif']);
 const fechaValida = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && !Number.isNaN(Date.parse(value));
 
 export async function GET(request: Request) {
@@ -24,7 +25,24 @@ export async function POST(request: Request) {
   const archivo = form.get('archivo');
   const fecha = form.get('fecha_aplicacion');
   if (!/^\d{8}$/.test(dni) || !(archivo instanceof File) || !fechaValida(fecha)) return NextResponse.json({ error: 'Paciente, imagen o fecha inválidos' }, { status: 400 });
-  if (!tipos.has(archivo.type) || !archivo.size || archivo.size > 3 * 1024 * 1024) return NextResponse.json({ error: 'Use una imagen JPG, PNG, WebP o GIF de hasta 3 MB' }, { status: 400 });
+  if (!tipos.has(archivo.type.toLowerCase()) || !archivo.size || archivo.size > 15 * 1024 * 1024) return NextResponse.json({ error: 'Use una imagen de hasta 15 MB' }, { status: 400 });
+  let contenido: Buffer;
+  let nombre = archivo.name.slice(0, 255);
+  let tipo = archivo.type.toLowerCase();
+  try {
+    const original = Buffer.from(await archivo.arrayBuffer());
+    if (original.length <= 3 * 1024 * 1024 && ['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(tipo)) {
+      await sharp(original).metadata();
+      contenido = original;
+    } else {
+      contenido = await sharp(original, { limitInputPixels: 40_000_000 }).rotate().resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80 }).toBuffer();
+      if (contenido.length > 3 * 1024 * 1024) return NextResponse.json({ error: 'La imagen es demasiado grande para guardarla' }, { status: 400 });
+      tipo = 'image/jpeg';
+      nombre = `${nombre.replace(/\.[^.]+$/, '').slice(0, 240)}.jpg`;
+    }
+  } catch {
+    return NextResponse.json({ error: 'No se pudo leer esta imagen. Pruebe con otra foto.' }, { status: 400 });
+  }
   try {
     await ensureTriajeVitaminasImagenes();
     const paciente = await pgPool.query('SELECT 1 FROM pacientes WHERE dni = $1 LIMIT 1', [dni]);
@@ -35,7 +53,7 @@ export async function POST(request: Request) {
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`triaje-vitaminas-${dni}`]);
       const count = await client.query('SELECT COUNT(*)::int AS total FROM triaje_vitaminas_imagenes WHERE dni_paciente = $1', [dni]);
       if (count.rows[0].total >= 200) { await client.query('ROLLBACK'); return NextResponse.json({ error: 'Máximo 200 imágenes de vitaminas por paciente' }, { status: 400 }); }
-      const result = await client.query('INSERT INTO triaje_vitaminas_imagenes (dni_paciente, nombre, tipo, contenido, fecha_aplicacion) VALUES ($1,$2,$3,$4,$5) RETURNING id, nombre, tipo, fecha_subida, fecha_aplicacion', [dni, archivo.name.slice(0, 255), archivo.type, Buffer.from(await archivo.arrayBuffer()), fecha]);
+      const result = await client.query('INSERT INTO triaje_vitaminas_imagenes (dni_paciente, nombre, tipo, contenido, fecha_aplicacion) VALUES ($1,$2,$3,$4,$5) RETURNING id, nombre, tipo, fecha_subida, fecha_aplicacion', [dni, nombre, tipo, contenido, fecha]);
       await client.query('COMMIT');
       return NextResponse.json(result.rows[0]);
     } catch (error) { await client.query('ROLLBACK'); throw error; }
