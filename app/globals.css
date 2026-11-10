@@ -376,3 +376,88 @@ html[data-intro-seen] .intro {
   @keyframes dashboard-float { to { transform: translate(-18px, 16px) rotate(10deg); } }
   @keyframes dashboard-grow { from { transform: scaleY(.05); opacity: .3; } }
 }
+
+/* Identidad clínica compartida por todos los módulos del sistema. */
+.module-shell {
+  --clinic-ink: #172b46;
+  --clinic-muted: #60748d;
+  --clinic-line: #d7e4f0;
+  --clinic-blue: #2263ad;
+  --clinic-aqua: #0b9ea8;
+  background:
+    radial-gradient(circle at 95% 0%, rgb(123 192 226 / .18), transparent 32%),
+    radial-gradient(circle at 6% 80%, rgb(70 172 172 / .12), transparent 28%),
+    linear-gradient(145deg, #f5f9fd 0%, #edf4fa 55%, #f7fbfc 100%) !important;
+  color: var(--clinic-ink) !important;
+}
+
+.module-shell .module-content > header {
+  background: rgb(255 255 255 / .93) !important;
+  border-bottom: 1px solid var(--clinic-line) !important;
+  box-shadow: 0 12px 30px rgb(28 67 112 / .055) !important;
+  backdrop-filter: blur(20px) saturate(1.25);
+}
+
+.module-shell .module-content > main :is(div, section, article, form).bg-white {
+  border-color: var(--clinic-line);
+  border-radius: 18px;
+  box-shadow: 0 10px 34px rgb(27 63 108 / .065);
+}
+
+.module-shell .module-content > main h1,
+.module-shell .module-content > main h2,
+.module-shell .module-content > main h3 { letter-spacing: -.025em; }
+
+.module-shell .module-content > main :is(input, select, textarea):focus-visible {
+  border-color: var(--clinic-blue) !important;
+  box-shadow: 0 0 0 4px rgb(34 99 173 / .13) !important;
+}
+
+.module-shell .module-content > main :is(button, a)[class*="bg-teal-600"],
+.module-shell .module-content > main :is(button, a)[class*="bg-sky-600"] {
+  background: linear-gradient(120deg, #2468bb, #167caa) !important;
+  box-shadow: 0 7px 17px rgb(33 105 175 / .17);
+}
+
+.module-patient-files { background: linear-gradient(135deg, #fff 45%, #edf6fc 100%) !important; }
+
+.sidebar-shell {
+  background: linear-gradient(165deg, #10213a 0%, #183a5d 54%, #122b48 100%) !important;
+  border-right: 1px solid rgb(184 218 240 / .16) !important;
+  box-shadow: 8px 0 36px rgb(18 46 80 / .13);
+}
+.sidebar-shell nav a[aria-current="page"] {
+  background: linear-gradient(110deg, #2c6fc0, #168eaa) !important;
+  box-shadow: 0 9px 22px rgb(8 27 53 / .26);
+}
+.sidebar-shell nav a[aria-current="page"]::before { background: #b8f5e8; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .module-shell .module-content > header { animation: clinic-header-in .45s ease-out both; }
+  .module-shell .module-content > main > :not(.fixed) { animation: clinic-reveal .58s cubic-bezier(.2,.8,.2,1) both; }
+  .module-shell .module-content > main > :nth-child(2) { animation-delay: 70ms; }
+  .module-shell .module-content > main > :nth-child(3) { animation-delay: 135ms; }
+  .module-shell .module-content > main > :nth-child(n+4) { animation-delay: 190ms; }
+  .module-shell .module-content > main :is(section, article).bg-white {
+    transition: transform .24s ease, box-shadow .24s ease, border-color .24s ease;
+  }
+  .module-shell .module-content > main :is(section, article).bg-white:hover {
+    transform: translateY(-2px);
+    border-color: #b9d3ea;
+    box-shadow: 0 16px 36px rgb(27 63 108 / .1);
+  }
+  .module-shell .module-content > main button:not(:disabled):active { transform: scale(.98); }
+  .sidebar-shell nav a svg { transition: transform .22s ease; }
+  .sidebar-shell nav a:hover svg { transform: scale(1.1); }
+  @keyframes clinic-header-in { from { opacity: .75; transform: translateY(-7px); } }
+  @keyframes clinic-reveal { from { opacity: 0; transform: translateY(12px); } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .module-shell *, .sidebar-shell * { animation: none !important; transition-duration: .01ms !important; }
+}
+
+@media print {
+  .module-shell { background: white !important; }
+  .module-shell .module-content > main :is(section, article).bg-white:hover { transform: none; box-shadow: none; }
+}

@@ -7,6 +7,7 @@ import ts from 'typescript';
 function prepararApi({ fallarEnInsercion = 0 } = {}) {
   const operaciones = [];
   const guardados = [];
+  const actualizaciones = [];
   let pendientes = [];
   let inserciones = 0;
   const cliente = {
@@ -30,6 +31,7 @@ function prepararApi({ fallarEnInsercion = 0 } = {}) {
     },
     async connect() { return cliente; }
   };
+  const pool = { async execute(sql, params) { actualizaciones.push({ sql, params }); return [{ affectedRows: 1 }]; } };
   const source = readFileSync(new URL('../app/api/vitaminas/route.ts', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
   const exports = {};
@@ -37,12 +39,12 @@ function prepararApi({ fallarEnInsercion = 0 } = {}) {
     exports,
     require(name) {
       if (name === 'next/server') return { NextResponse: { json: (body, init) => ({ body, status: init?.status || 200 }) } };
-      if (name === '@/lib/db') return { pgPool, pool: {} };
+      if (name === '@/lib/db') return { pgPool, pool };
       throw new Error(`Importación inesperada: ${name}`);
     },
     console: { error() {} }, Date, URL
   });
-  return { POST: exports.POST, operaciones, guardados };
+  return { POST: exports.POST, PUT: exports.PUT, operaciones, guardados, actualizaciones };
 }
 
 const solicitud = (fechaAplicacion) => new Request('https://example.test/api/vitaminas', {
@@ -66,6 +68,22 @@ test('conserva exactamente la hora mostrada al guardar varios productos', async 
   assert.equal(respuesta.status, 201);
   assert.equal(api.guardados.length, 5);
   assert.ok(api.guardados.every(params => params[6].toISOString() === horaMostrada));
+});
+
+test('permite elegir una fecha anterior y modificarla al editar la aplicación', async () => {
+  const api = prepararApi();
+  const fechaElegida = '2024-06-15T14:30:00.000Z';
+  const creada = await api.POST(solicitud(fechaElegida));
+  assert.equal(creada.status, 201);
+  assert.ok(api.guardados.every(params => params[6].toISOString() === fechaElegida));
+  const editada = await api.PUT(new Request('https://example.test/api/vitaminas', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: 1, dni_paciente: '12345678', vitaminaNombre: 'Vitamina 1', dosis: '2 ampollas', via: 'Intravenosa', fechaAplicacion: '2024-06-16T14:30:00.000Z' })
+  }));
+  assert.equal(editada.status, 200);
+  assert.equal(api.actualizaciones.length, 1);
+  assert.match(api.actualizaciones[0].sql, /fechaaplicacion/);
+  assert.equal(api.actualizaciones[0].params[4].toISOString(), '2024-06-16T14:30:00.000Z');
 });
 
 test('guarda cinco vitaminas juntas con la misma fecha y hora', async () => {

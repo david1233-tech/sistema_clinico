@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { agruparSesiones } from '@/lib/vitaminas-sesiones';
 import { normalizarBusqueda } from '@/lib/busqueda-pacientes';
+import { fechaManualIso, fechaPeruParaInput } from '@/lib/vitaminas-fecha';
 import VitaminasSeguimiento from '@/components/VitaminasSeguimiento';
 
 interface Paciente {
@@ -205,6 +206,7 @@ function VitaminasPageContent() {
   const [letraNombre, setLetraNombre] = useState('');
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
   const [fechaMostrada, setFechaMostrada] = useState<string | null>(null);
+  const [fechaManual, setFechaManual] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [errorPacientes, setErrorPacientes] = useState('');
   const [saving, setSaving] = useState<boolean>(false);
@@ -362,6 +364,7 @@ function VitaminasPageContent() {
       !confirm('Los datos del formulario que aún no guardó se perderán. ¿Cambiar de paciente?')) return;
     setPacienteSeleccionado(p);
     setFechaMostrada(new Date().toISOString());
+    setFechaManual(null);
     setGaleriaAbierta(false);
     setFichaAbierta(false);
     setRegistroEditando(null);
@@ -380,6 +383,7 @@ function VitaminasPageContent() {
     setFormVitamina(nuevaVitamina());
     setVitaminasAdicionales([]);
     setFormVersion(prev => prev + 1);
+    setFechaManual(null);
   };
 
   const handleAgregarVitamina = () => {
@@ -394,6 +398,7 @@ function VitaminasPageContent() {
     setRegistroEditando(tratamiento);
     setVitaminasAdicionales([]);
     setFormVersion(prev => prev + 1);
+    setFechaManual(tratamiento.fechaAplicacion ? fechaPeruParaInput(tratamiento.fechaAplicacion) : null);
     setFormVitamina({
       id: 0,
       vitaminaNombre: tratamiento.vitaminaNombre,
@@ -424,7 +429,8 @@ function VitaminasPageContent() {
       alert('Complete el nombre, la dosis y la vía de cada vitamina o suero.');
       return;
     }
-    const fechaCapturada = fechaMostrada || new Date().toISOString();
+    const fechaCapturada = fechaManual === null ? fechaMostrada || new Date().toISOString() : fechaManualIso(fechaManual);
+    if (!fechaCapturada) { alert('Seleccione una fecha y hora válidas.'); return; }
     try {
       setSaving(true);
       const response = await fetch('/api/vitaminas', {
@@ -434,7 +440,7 @@ function VitaminasPageContent() {
           ...aplicaciones[0],
           dni_paciente: pacienteSeleccionado.dni_paciente,
           nombre_paciente: pacienteSeleccionado.nombre_paciente,
-          ...(!registroEditando ? { fechaAplicacion: fechaCapturada } : {}),
+          fechaAplicacion: fechaCapturada,
           ...(registroEditando ? { id: registroEditando.id } : { tratamientos: aplicaciones })
         })
       });
@@ -442,7 +448,7 @@ function VitaminasPageContent() {
       const guardado: { data?: Tratamiento[] } = await response.json();
       let listaActualizada: Tratamiento[];
       if (registroEditando) {
-        listaActualizada = tratamientos.map(t => t.id === registroEditando.id ? { ...t, ...aplicaciones[0] } : t);
+        listaActualizada = tratamientos.map(t => t.id === registroEditando.id ? { ...t, ...aplicaciones[0], fechaAplicacion: fechaCapturada } : t);
       } else {
         if (!Array.isArray(guardado.data) || guardado.data.length !== aplicaciones.length) {
           throw new Error('Las vitaminas se guardaron, pero no se recibió la confirmación completa. Recargue la página antes de volver a intentar.');
@@ -559,6 +565,7 @@ function VitaminasPageContent() {
   const totalPendientes = pacientes.length - totalAplicados;
   const tratamientosPaciente = tratamientos.filter(t => t.dni_paciente === pacienteSeleccionado?.dni_paciente);
   const sesionesPaciente = agruparSesiones(tratamientosPaciente);
+  const fechaElegida = fechaManualIso(fechaManual);
   const adjuntosPacienteCount = adjuntos.filter(item => item.origen === 'paciente').length;
   const adjuntosVisibles = adjuntos.filter(item => (filtroAdjuntos === 'todos' || (filtroAdjuntos === 'pdf' ? item.tipo === 'application/pdf' : item.tipo !== 'application/pdf')) && normalizarBusqueda(item.nombre).includes(normalizarBusqueda(busquedaAdjuntos)));
 
@@ -718,7 +725,7 @@ function VitaminasPageContent() {
                           DNI: {pacienteSeleccionado.dni_paciente} {pacienteSeleccionado.edad ? `• ${pacienteSeleccionado.edad} años` : ''}
                         </span>
                         <p className="m-0 mt-2 inline-flex rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-900" aria-live="off">
-                          Hora de aplicación: {fechaMostrada ? new Date(fechaMostrada).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'medium' }) : 'Cargando hora...'}
+                          Fecha y hora de aplicación: {fechaManual !== null ? fechaElegida ? new Date(fechaElegida).toLocaleString('es-PE', { timeZone: 'America/Lima', dateStyle: 'short', timeStyle: 'medium' }) : 'Seleccione una fecha' : fechaMostrada ? new Date(fechaMostrada).toLocaleString('es-PE', { timeZone: 'America/Lima', dateStyle: 'short', timeStyle: 'medium' }) : 'Cargando hora...'}
                         </p>
                       </div>
                       {pacienteSeleccionado.aplicaVitamina && (
@@ -742,6 +749,10 @@ function VitaminasPageContent() {
                         </div>
                       )}
                     </div>
+                    <div className="flex flex-wrap items-end gap-3 rounded-xl border border-sky-200 bg-sky-50/80 p-4">
+                      <div className="min-w-[220px] flex-1"><span className="block text-[11px] font-extrabold uppercase tracking-wide text-sky-800">Fecha y hora de esta aplicación</span><strong className="mt-1 block text-sm text-slate-900">{fechaManual !== null ? fechaElegida ? new Date(fechaElegida).toLocaleString('es-PE', { timeZone: 'America/Lima', dateStyle: 'full', timeStyle: 'short' }) : 'Seleccione una fecha y hora' : fechaMostrada ? new Date(fechaMostrada).toLocaleString('es-PE', { timeZone: 'America/Lima', dateStyle: 'full', timeStyle: 'short' }) : 'Preparando hora...'}</strong><span className="mt-1 block text-xs text-slate-600">{fechaManual === null ? 'Se guardará con la fecha y hora actuales.' : 'Se guardará con la fecha y hora elegidas.'}</span></div>
+                      {fechaManual === null ? <button type="button" onClick={() => setFechaManual(fechaPeruParaInput(fechaMostrada || new Date().toISOString()))} className="rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-bold text-sky-800">Cambiar fecha y hora</button> : <><label className="text-xs font-bold text-sky-900">Elegir fecha y hora<input type="datetime-local" step="1" required value={fechaManual} onChange={event => setFechaManual(event.target.value)} className="mt-1 block rounded-lg border border-sky-300 bg-white p-2 text-sm text-slate-900" /></label><button type="button" onClick={() => setFechaManual(null)} className="rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-bold text-sky-800">Usar fecha actual</button></>}
+                    </div>
                   </div>
 
                   <form id="formulario-vitamina" onSubmit={handleGuardarVitamina} className="xl:col-span-2 bg-white rounded-2xl border border-teal-200 p-5 md:p-6 shadow-sm flex flex-col gap-4 scroll-mt-24 min-w-0">
@@ -756,7 +767,7 @@ function VitaminasPageContent() {
                     <ProductoAplicado key={formVersion} item={formVitamina} numero={1} onChange={setFormVitamina} />
                     {vitaminasAdicionales.map((item, indice) => <ProductoAplicado key={item.id} item={item} numero={indice + 2} onChange={actualizado => setVitaminasAdicionales(prev => prev.map(v => v.id === actualizado.id ? actualizado : v))} onRemove={() => setVitaminasAdicionales(prev => prev.filter(v => v.id !== item.id))} />)}
                     {!registroEditando && <button type="button" onClick={handleAgregarVitamina} disabled={saving || vitaminasAdicionales.length >= 49} className="w-full rounded-2xl border-2 border-dashed border-sky-400 bg-sky-50 px-5 py-5 text-center text-sm font-black text-sky-900 shadow-sm hover:bg-sky-100 disabled:opacity-50">＋ Agregar nueva vitamina o suero</button>}
-                    <p className="m-0 text-xs font-semibold text-slate-600">{registroEditando ? 'La edición conserva la fecha y hora originales del registro.' : 'Al guardar, todos los productos se registrarán con la fecha y hora mostradas junto al paciente.'}</p>
+                    <p className="m-0 text-xs font-semibold text-slate-600">Todos los productos se registrarán con la fecha y hora mostradas arriba. Puede elegir una fecha anterior antes de guardar.</p>
                     <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
                       <button
                         type="button"

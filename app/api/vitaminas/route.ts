@@ -156,14 +156,18 @@ export async function PUT(request: Request) {
   const dni = String(body.dni_paciente ?? '').trim();
   const vitamina = String(body.vitaminaNombre ?? '').trim();
   const dosis = String(body.dosis ?? '').trim();
+  const fechaEditada = body.fechaAplicacion;
   if (!Number.isSafeInteger(id) || id <= 0 || !/^\d{8}$/.test(dni) || !vitamina || !dosis) {
     return NextResponse.json({ error: 'Complete el paciente, la vitamina o suero y la dosis.' }, { status: 400 });
+  }
+  if (fechaEditada !== undefined && (typeof fechaEditada !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(fechaEditada) || Number.isNaN(Date.parse(fechaEditada)))) {
+    return NextResponse.json({ error: 'Fecha y hora de aplicación inválidas.' }, { status: 400 });
   }
   try {
     const columnas = await asegurarTablaRecetas();
     const [result] = await pool.execute<ResultSetHeader>(
-      `UPDATE recetas SET ${columnas.vitamina} = ?, dosis = ?, via = ?, observaciones = ? WHERE id = ? AND dni_paciente = ?`,
-      [vitamina, dosis, String(body.via ?? '').trim(), String(body.observaciones ?? '').trim(), id, dni]
+      `UPDATE recetas SET ${columnas.vitamina} = ?, dosis = ?, via = ?, observaciones = ?${fechaEditada ? `, ${columnas.fecha} = ?` : ''} WHERE id = ? AND dni_paciente = ?`,
+      [vitamina, dosis, String(body.via ?? '').trim(), String(body.observaciones ?? '').trim(), ...(fechaEditada ? [new Date(fechaEditada as string)] : []), id, dni]
     );
     if (!result.affectedRows) return NextResponse.json({ error: 'Tratamiento no encontrado.' }, { status: 404 });
     return NextResponse.json({ success: true });
