@@ -42,6 +42,8 @@ interface VitaminaAdicional {
   observaciones: string;
 }
 
+const nuevaVitamina = (id = 0): VitaminaAdicional => ({ id, vitaminaNombre: '', dosis: '', via: '', viaOpcion: '', observaciones: '' });
+
 const CATALOGO_VITAMINAS = Array.from(new Set(`19 Plus
 Ametil Z M
 Amin Lsi
@@ -150,6 +152,37 @@ Vtb5
 Vtb7
 Zing`.split('\n')));
 
+function ProductoAplicado({ item, numero, onChange, onRemove }: {
+  item: VitaminaAdicional;
+  numero: number;
+  onChange: (item: VitaminaAdicional) => void;
+  onRemove?: () => void;
+}) {
+  const [busqueda, setBusqueda] = useState('');
+  const [mostrarOpciones, setMostrarOpciones] = useState(false);
+  const opciones = busqueda.trim()
+    ? CATALOGO_VITAMINAS.filter(nombre => normalizarBusqueda(nombre).includes(normalizarBusqueda(busqueda))).slice(0, 12)
+    : [];
+  const campo = 'w-full rounded-xl border border-sky-200 bg-white p-3 text-sm font-semibold text-slate-900 outline-none focus:border-sky-600';
+  const seleccionar = (nombre: string) => { onChange({ ...item, vitaminaNombre: nombre }); setBusqueda(''); setMostrarOpciones(false); };
+
+  return <div className="rounded-2xl border border-sky-200 bg-sky-50/50 p-4 md:p-5">
+    <div className="mb-4 flex items-center justify-between gap-3"><h4 className="m-0 text-sm font-extrabold text-sky-900">Vitamina o suero {numero}</h4>{onRemove && <button type="button" onClick={onRemove} className="text-xs font-bold text-rose-700">Quitar este recuadro</button>}</div>
+    <div className="grid gap-4 md:grid-cols-2">
+      <div className="relative rounded-xl border border-sky-100 bg-white p-3" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setMostrarOpciones(false); }}>
+        <label htmlFor={`catalogo-vitamina-${item.id}`} className="mb-1 block text-xs font-extrabold text-sky-900">Buscar en el catálogo</label>
+        <input id={`catalogo-vitamina-${item.id}`} type="search" autoComplete="off" value={busqueda} onChange={event => { setBusqueda(event.target.value); setMostrarOpciones(true); }} onFocus={() => setMostrarOpciones(true)} onKeyDown={event => { if (event.key === 'Escape') setMostrarOpciones(false); }} placeholder="Escriba el nombre de la vitamina o suero" className={campo} role="combobox" aria-autocomplete="list" aria-controls={`catalogo-opciones-${item.id}`} aria-expanded={mostrarOpciones && Boolean(busqueda.trim())} />
+        {mostrarOpciones && busqueda.trim() && <div id={`catalogo-opciones-${item.id}`} className="absolute left-3 right-3 z-30 mt-1 max-h-56 overflow-y-auto rounded-xl border border-sky-200 bg-white shadow-lg">{opciones.length ? opciones.map(nombre => <button key={nombre} type="button" onClick={() => seleccionar(nombre)} className="block w-full border-b border-sky-50 px-3 py-2 text-left text-sm hover:bg-sky-50">{nombre}</button>) : <p className="m-0 p-3 text-xs text-slate-600">Sin coincidencias. Puede escribir el nombre manualmente.</p>}</div>}
+        <p className="mb-0 text-xs text-slate-500">Seleccione un resultado para completar el recuadro de al lado.</p>
+      </div>
+      <div className="rounded-xl border border-sky-100 bg-white p-3"><label htmlFor={`nombre-vitamina-${item.id}`} className="mb-1 block text-xs font-extrabold text-sky-900">Vitamina o suero aplicado *</label><input id={`nombre-vitamina-${item.id}`} required maxLength={200} value={item.vitaminaNombre} onChange={event => onChange({ ...item, vitaminaNombre: event.target.value })} placeholder="Seleccione del catálogo o escriba aquí" className={campo} /></div>
+      <label className="text-xs font-extrabold text-slate-800">Dosis o cantidad *<input required maxLength={100} value={item.dosis} onChange={event => onChange({ ...item, dosis: event.target.value })} placeholder="Ej.: 1 ampolla, 100 ml" className={`${campo} mt-1`} /></label>
+      <div><label htmlFor={`via-vitamina-${item.id}`} className="mb-1 block text-xs font-extrabold text-slate-800">Tipo de aplicación *</label><select id={`via-vitamina-${item.id}`} required value={item.viaOpcion} onChange={event => { const viaOpcion = event.target.value; onChange({ ...item, viaOpcion, via: viaOpcion === 'Otra' ? '' : viaOpcion }); }} className={campo}><option value="">Seleccione una vía</option><option value="Intravenosa">Intravenosa</option><option value="Intramuscular">Intramuscular</option><option value="Subcutánea">Subcutánea</option><option value="Otra">Otra (escribir)</option></select>{item.viaOpcion === 'Otra' && <input required maxLength={100} value={item.via} onChange={event => onChange({ ...item, via: event.target.value })} placeholder="Escriba la vía de aplicación" aria-label="Otra vía de aplicación" className={`${campo} mt-2`} />}</div>
+      <label className="text-xs font-extrabold text-slate-800 md:col-span-2">Observaciones de esta vitamina o suero<textarea rows={2} value={item.observaciones} onChange={event => onChange({ ...item, observaciones: event.target.value })} placeholder="Notas de aplicación (opcional)" className={`${campo} mt-1 resize-y`} /></label>
+    </div>
+  </div>;
+}
+
 function actualizarResumenPaciente(paciente: Paciente, tratamientos: Tratamiento[]) {
   const ultimo = tratamientos.find(t => t.dni_paciente === paciente.dni_paciente);
   return {
@@ -170,10 +203,6 @@ function VitaminasPageContent() {
   const [tratamientos, setTratamientos] = useState<Tratamiento[]>([]);
   const [busqueda, setBusqueda] = useState<string>('');
   const [letraNombre, setLetraNombre] = useState('');
-  const [busquedaVitamina, setBusquedaVitamina] = useState('');
-  const [mostrarCatalogo, setMostrarCatalogo] = useState(false);
-  const catalogoRef = useRef<HTMLDivElement>(null);
-  const [viaOpcion, setViaOpcion] = useState('');
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [errorPacientes, setErrorPacientes] = useState('');
@@ -190,30 +219,11 @@ function VitaminasPageContent() {
   const [cargandoAdjuntos, setCargandoAdjuntos] = useState(false);
   const [avanceAdjuntos, setAvanceAdjuntos] = useState('');
   
-  const [formVitamina, setFormVitamina] = useState({
-    vitaminaNombre: '',
-    dosis: '',
-    via: '',
-    observaciones: ''
-  });
+  const [formVitamina, setFormVitamina] = useState<VitaminaAdicional>(() => nuevaVitamina());
+  const [formVersion, setFormVersion] = useState(0);
 
   useEffect(() => {
     fetchPacientesTodos();
-  }, []);
-
-  useEffect(() => {
-    const cerrarFuera = (event: PointerEvent) => {
-      if (catalogoRef.current && !catalogoRef.current.contains(event.target as Node)) setMostrarCatalogo(false);
-    };
-    const cerrarEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMostrarCatalogo(false);
-    };
-    document.addEventListener('pointerdown', cerrarFuera);
-    document.addEventListener('keydown', cerrarEscape);
-    return () => {
-      document.removeEventListener('pointerdown', cerrarFuera);
-      document.removeEventListener('keydown', cerrarEscape);
-    };
   }, []);
 
   useEffect(() => {
@@ -347,10 +357,8 @@ function VitaminasPageContent() {
     setFichaAbierta(false);
     setRegistroEditando(null);
     setVitaminasAdicionales([]);
-    setFormVitamina({ vitaminaNombre: '', dosis: '', via: '', observaciones: '' });
-    setViaOpcion('');
-    setBusquedaVitamina('');
-    setMostrarCatalogo(false);
+    setFormVitamina(nuevaVitamina());
+    setFormVersion(prev => prev + 1);
     
     localStorage.setItem('paciente_activo_vital_salud', JSON.stringify({
       dni: p.dni_paciente,
@@ -360,30 +368,15 @@ function VitaminasPageContent() {
   };
 
   const handleLimpiarFormulario = () => {
-    setFormVitamina({
-      vitaminaNombre: '',
-      dosis: '',
-      via: '',
-      observaciones: ''
-    });
-    setViaOpcion('');
+    setFormVitamina(nuevaVitamina());
     setVitaminasAdicionales([]);
-    setBusquedaVitamina('');
-    setMostrarCatalogo(false);
+    setFormVersion(prev => prev + 1);
   };
 
   const handleAgregarVitamina = () => {
-    if (!busquedaVitamina.trim() || vitaminasAdicionales.length >= 49) return;
-    if (!formVitamina.vitaminaNombre || registroEditando) setFormVitamina(prev => ({ ...prev, vitaminaNombre: busquedaVitamina.trim() }));
-    else {
-      siguienteAdicionalId.current += 1;
-      setVitaminasAdicionales(prev => [...prev, {
-        id: siguienteAdicionalId.current,
-        vitaminaNombre: busquedaVitamina.trim(), dosis: '', via: '', viaOpcion: '', observaciones: ''
-      }]);
-    }
-    setBusquedaVitamina('');
-    setMostrarCatalogo(false);
+    if (registroEditando || vitaminasAdicionales.length >= 49) return;
+    siguienteAdicionalId.current += 1;
+    setVitaminasAdicionales(prev => [...prev, nuevaVitamina(siguienteAdicionalId.current)]);
   };
 
   const handleEditarTratamiento = (tratamiento: Tratamiento) => {
@@ -391,15 +384,15 @@ function VitaminasPageContent() {
     if (vitaminasAdicionales.length > 0 && !confirm('Las vitaminas adicionales sin guardar se perderán. ¿Editar este registro?')) return;
     setRegistroEditando(tratamiento);
     setVitaminasAdicionales([]);
+    setFormVersion(prev => prev + 1);
     setFormVitamina({
+      id: 0,
       vitaminaNombre: tratamiento.vitaminaNombre,
       dosis: tratamiento.dosis || '',
       via: tratamiento.via || '',
+      viaOpcion: ['Endovenosa', 'Intravenosa', 'Intramuscular', 'Subcutánea'].includes(tratamiento.via) ? tratamiento.via : tratamiento.via ? 'Otra' : '',
       observaciones: tratamiento.observaciones || ''
     });
-    setViaOpcion(['Endovenosa', 'Intravenosa', 'Intramuscular'].includes(tratamiento.via) ? tratamiento.via : tratamiento.via ? 'Otra' : '');
-    setBusquedaVitamina('');
-    setMostrarCatalogo(false);
     document.getElementById('formulario-vitamina')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
@@ -411,7 +404,7 @@ function VitaminasPageContent() {
   const handleGuardarVitamina = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pacienteSeleccionado) return;
-    const aplicaciones = [formVitamina, ...vitaminasAdicionales.map(({ vitaminaNombre }) => ({ ...formVitamina, vitaminaNombre }))]
+    const aplicaciones = [formVitamina, ...vitaminasAdicionales]
       .map(item => ({
         vitaminaNombre: item.vitaminaNombre.trim(),
         dosis: item.dosis.trim(),
@@ -428,7 +421,7 @@ function VitaminasPageContent() {
         method: registroEditando ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formVitamina,
+          ...aplicaciones[0],
           dni_paciente: pacienteSeleccionado.dni_paciente,
           nombre_paciente: pacienteSeleccionado.nombre_paciente,
           ...(registroEditando ? { id: registroEditando.id } : { tratamientos: aplicaciones })
@@ -534,8 +527,7 @@ function VitaminasPageContent() {
         setTratamientos(prev => prev.map(t => t.dni_paciente === pacienteSinVitamina.dni_paciente ? { ...t, activo: false } : t));
         setPacienteSeleccionado(pacienteSinVitamina);
         setRegistroEditando(null);
-        setFormVitamina({ vitaminaNombre: '', dosis: '', via: '', observaciones: '' });
-        setViaOpcion('');
+        setFormVitamina(nuevaVitamina());
       } catch (err) {
         console.error('Error desmarcando vitamina:', err);
         alert(err instanceof Error ? err.message : 'No se pudo actualizar el tratamiento');
@@ -557,7 +549,6 @@ function VitaminasPageContent() {
   const sesionesPaciente = agruparSesiones(tratamientosPaciente);
   const adjuntosPacienteCount = adjuntos.filter(item => item.origen === 'paciente').length;
   const adjuntosVisibles = adjuntos.filter(item => (filtroAdjuntos === 'todos' || (filtroAdjuntos === 'pdf' ? item.tipo === 'application/pdf' : item.tipo !== 'application/pdf')) && normalizarBusqueda(item.nombre).includes(normalizarBusqueda(busquedaAdjuntos)));
-  const opcionesVitamina = busquedaVitamina.trim() ? CATALOGO_VITAMINAS.filter(nombre => normalizarBusqueda(nombre).includes(normalizarBusqueda(busquedaVitamina))).slice(0, 12) : [];
 
   return (
     <div className="module-shell flex min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50 font-sans text-slate-900">
@@ -768,133 +759,11 @@ function VitaminasPageContent() {
                         <p className="m-0 text-xs text-teal-100">{registroEditando ? 'Los cambios se aplicarán solo a este registro.' : 'Elija o escriba el producto; después complete los datos de aplicación.'}</p>
                       </div>
                     </div>
-                    <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-4 flex flex-col gap-3">
-                      <div><span className="text-[11px] font-extrabold text-sky-800 uppercase">1 · Producto aplicado</span><p className="text-xs text-slate-600 m-0 mt-1">Puede buscar en el catálogo o escribir directamente el nombre. Si agrega varios, compartirán la dosis, vía y observaciones.</p></div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
-                          VITAMINA, INYECTABLE O SUERO *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={formVitamina.vitaminaNombre}
-                          onChange={(e) => setFormVitamina({ ...formVitamina, vitaminaNombre: e.target.value })}
-                          placeholder="Ej: Vitamina C 10g / Neurobión / Complejo B"
-                          className="w-full p-3 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600 focus:bg-white"
-                        />
-                      </div>
-                      <div ref={catalogoRef} className="relative">
-                        <label htmlFor="buscar-vitamina" className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
-                          BUSCAR EN EL CATÁLOGO (OPCIONAL)
-                        </label>
-                        <input
-                          id="buscar-vitamina"
-                          type="search"
-                          autoComplete="off"
-                          value={busquedaVitamina}
-                          onChange={(e) => { setBusquedaVitamina(e.target.value); setMostrarCatalogo(true); }}
-                          onFocus={() => setMostrarCatalogo(Boolean(busquedaVitamina.trim()))}
-                          placeholder="Buscar por nombre; pulse Esc para cerrar"
-                          className="w-full p-3 rounded-xl border border-slate-300 bg-white font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600"
-                          role="combobox"
-                          aria-autocomplete="list"
-                          aria-controls="opciones-vitaminas"
-                          aria-expanded={mostrarCatalogo && Boolean(busquedaVitamina.trim())}
-                        />
-                        {mostrarCatalogo && Boolean(busquedaVitamina.trim()) && (
-                          <div id="opciones-vitaminas" className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-300 bg-white shadow-lg">
-                            <div className="sticky top-0 bg-slate-50 border-b border-slate-200 px-3 py-2 flex items-center justify-between gap-2"><span className="text-[11px] text-slate-600">Seleccione un producto o cierre la búsqueda</span><button type="button" onClick={() => setMostrarCatalogo(false)} className="text-xs font-bold text-teal-800">Cerrar ✕</button></div>
-                            {opcionesVitamina.length > 0 ? opcionesVitamina.map(nombre => (
-                              <button
-                                key={nombre}
-                                type="button"
-                                onClick={() => {
-                                  if (!formVitamina.vitaminaNombre || registroEditando) setFormVitamina(prev => ({ ...prev, vitaminaNombre: nombre }));
-                                  else {
-                                    siguienteAdicionalId.current += 1;
-                                    setVitaminasAdicionales(prev => prev.length >= 49 ? prev : [...prev, { id: siguienteAdicionalId.current, vitaminaNombre: nombre, dosis: '', via: '', viaOpcion: '', observaciones: '' }]);
-                                  }
-                                  setBusquedaVitamina('');
-                                  setMostrarCatalogo(false);
-                                }}
-                                className="block w-full px-3 py-2 text-left text-xs md:text-sm font-semibold text-slate-800 hover:bg-teal-50 cursor-pointer"
-                              >
-                                {nombre}
-                              </button>
-                            )) : <p className="m-0 p-3 text-xs text-slate-500">No se encontraron opciones. Puede escribir el nombre manualmente.</p>}
-                          </div>
-                        )}
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {vitaminasAdicionales.map(item => <span key={item.id} className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200 px-3 py-1 text-xs font-bold text-teal-900">{item.vitaminaNombre}<button type="button" onClick={() => setVitaminasAdicionales(prev => prev.filter(v => v.id !== item.id))} aria-label={`Quitar ${item.vitaminaNombre}`} className="text-rose-700">✕</button></span>)}
-                        </div>
-                        {vitaminasAdicionales.length > 0 && <p className="text-[11px] text-teal-800 m-0 mt-1">{1 + vitaminasAdicionales.length} productos en esta aplicación. Todos usarán la dosis, vía y observaciones de abajo.</p>}
-                        <button type="button" onClick={handleAgregarVitamina} disabled={!busquedaVitamina.trim() || vitaminasAdicionales.length >= 49} className="mt-2 text-xs font-bold text-teal-700 disabled:opacity-40">＋ Agregar lo escrito</button>
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
-                          DOSIS / CANTIDAD *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={formVitamina.dosis}
-                          onChange={(e) => setFormVitamina({ ...formVitamina, dosis: e.target.value })}
-                          placeholder="Ej: 1 ampolla / 100 ml / 1 frasco"
-                          className="w-full p-3 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600 focus:bg-white"
-                        />
-                      </div>
-                    </div>
-                    </div>
-                    <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-4 flex flex-col gap-4">
-                      <div><span className="text-[11px] font-extrabold text-teal-800 uppercase">2 · Datos de aplicación</span><p className="text-xs text-slate-600 m-0 mt-1">Indique la vía y agregue observaciones si corresponde.</p></div>
-                    <div>
-                      <label htmlFor="via-vitamina" className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
-                        VÍA DE ADMINISTRACIÓN
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <select
-                          id="via-vitamina"
-                          value={viaOpcion}
-                          onChange={(e) => {
-                            const opcion = e.target.value;
-                            setViaOpcion(opcion);
-                            setFormVitamina(prev => ({ ...prev, via: opcion === 'Otra' ? '' : opcion }));
-                          }}
-                          required
-                          className="w-full p-3 rounded-xl border border-teal-200 bg-white font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600"
-                        >
-                          <option value="">Seleccionar vía...</option>
-                          <option value="Endovenosa">Endovenosa</option>
-                          <option value="Intravenosa">Intravenosa</option>
-                          <option value="Intramuscular">Intramuscular</option>
-                          <option value="Otra">Otra (escribir)</option>
-                        </select>
-                        {viaOpcion === 'Otra' && (
-                          <input
-                            type="text"
-                            value={formVitamina.via}
-                            onChange={(e) => setFormVitamina(prev => ({ ...prev, via: e.target.value }))}
-                            placeholder="Escriba otra vía de administración"
-                            required
-                            className="w-full p-3 rounded-xl border border-teal-200 bg-white font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600"
-                          />
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-extrabold text-slate-900 mb-1 uppercase tracking-wider">
-                        OBSERVACIONES / NOTAS DE APLICACIÓN
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={formVitamina.observaciones}
-                        onChange={(e) => setFormVitamina({ ...formVitamina, observaciones: e.target.value })}
-                        placeholder="Detalles del procedimiento o tolerancia del paciente..."
-                        className="w-full p-3 rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 text-xs md:text-sm outline-none focus:border-teal-600 focus:bg-white resize-y"
-                      />
-                    </div>
-                    </div>
+                    <p className="m-0 text-xs text-slate-600">Busque en el catálogo a la izquierda o escriba el nombre a la derecha. Cada producto conserva su propia dosis, vía y observaciones.</p>
+                    <ProductoAplicado key={formVersion} item={formVitamina} numero={1} onChange={setFormVitamina} />
+                    {vitaminasAdicionales.map((item, indice) => <ProductoAplicado key={item.id} item={item} numero={indice + 2} onChange={actualizado => setVitaminasAdicionales(prev => prev.map(v => v.id === actualizado.id ? actualizado : v))} onRemove={() => setVitaminasAdicionales(prev => prev.filter(v => v.id !== item.id))} />)}
+                    {!registroEditando && <button type="button" onClick={handleAgregarVitamina} disabled={saving || vitaminasAdicionales.length >= 49} className="self-start rounded-xl border border-sky-300 bg-sky-50 px-4 py-3 text-sm font-extrabold text-sky-800 hover:bg-sky-100 disabled:opacity-50">＋ Agregar otra vitamina o suero</button>}
+                    <p className="m-0 text-xs font-semibold text-slate-600">Al guardar, todos los productos de esta aplicación compartirán la fecha y hora actuales.</p>
                     <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
                       <button
                         type="button"

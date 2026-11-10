@@ -53,7 +53,7 @@ const solicitud = () => new Request('https://example.test/api/vitaminas', {
     nombre_paciente: 'Paciente',
     tratamientos: Array.from({ length: 5 }, (_, indice) => ({
       vitaminaNombre: `Vitamina ${indice + 1}`,
-      dosis: '1 ampolla', via: 'Endovenosa', observaciones: ''
+      dosis: `${indice + 1} ampolla(s)`, via: indice % 2 ? 'Intramuscular' : 'Intravenosa', observaciones: `Producto ${indice + 1}`
     }))
   })
 });
@@ -66,6 +66,8 @@ test('guarda cinco vitaminas juntas con la misma fecha y hora', async () => {
   assert.deepEqual(api.operaciones, ['BEGIN', 'COMMIT', 'RELEASE']);
   assert.equal(api.guardados.length, 5);
   assert.equal(new Set(api.guardados.map(params => params[6].getTime())).size, 1);
+  assert.deepEqual(api.guardados.map(params => params[3]), ['1 ampolla(s)', '2 ampolla(s)', '3 ampolla(s)', '4 ampolla(s)', '5 ampolla(s)']);
+  assert.deepEqual(api.guardados.map(params => params[4]), ['Intravenosa', 'Intramuscular', 'Intravenosa', 'Intramuscular', 'Intravenosa']);
 });
 
 test('revierte todo el lote si falla una de las vitaminas', async () => {
