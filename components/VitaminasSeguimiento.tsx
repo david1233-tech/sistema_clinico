@@ -75,7 +75,7 @@ export default function VitaminasSeguimiento({ dni, nombre }: { dni: string; nom
   const entrada = 'w-full min-w-[76px] rounded-md border border-sky-200 bg-white px-2 py-2 text-sm text-slate-900 focus:border-sky-600 focus:outline-none';
   const boton = 'rounded-lg bg-sky-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-800 disabled:opacity-50';
 
-  return <section id="ficha-seguimiento" className="order-3 xl:col-span-2 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm md:p-6 print:border-0 print:p-0 print:shadow-none" aria-label="Ficha de seguimiento">
+  return <section id="ficha-seguimiento" className="xl:col-span-2 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm md:p-6 print:border-0 print:p-0 print:shadow-none" aria-label="Ficha de seguimiento">
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-sky-200 pb-4">
       <div><span className="text-xs font-bold uppercase tracking-wider text-sky-700">Módulo Vitaminas</span><h3 className="m-0 text-xl font-black text-slate-900">Ficha de seguimiento</h3><p className="m-0 text-sm text-slate-600">{nombre} · DNI {dni} · Fecha: {new Date().toLocaleDateString('es-PE')}</p></div>
       <div className="flex flex-wrap gap-2 print:hidden"><button type="button" onClick={() => window.print()} className="rounded-lg border border-sky-300 px-3 py-2 text-sm font-bold text-sky-800">Imprimir</button><button type="button" onClick={() => window.print()} className="rounded-lg border border-sky-300 px-3 py-2 text-sm font-bold text-sky-800" title="En el cuadro de impresión, elija Guardar como PDF">Exportar a PDF</button></div>

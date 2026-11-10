@@ -744,29 +744,7 @@ function VitaminasPageContent() {
                     </div>
                   </div>
 
-                  <div className="order-2 xl:col-span-2 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm print:hidden">
-                    <div className="flex flex-wrap items-center justify-between gap-3"><div><span className="text-xs font-bold uppercase text-sky-700">Seguimiento clínico</span><h3 className="m-0 text-base font-black text-slate-900">Controles diarios y procedimientos</h3></div><button type="button" onClick={() => setFichaAbierta(prev => !prev)} className="rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-bold text-white">{fichaAbierta ? 'Cerrar ficha' : 'Abrir ficha de seguimiento'}</button></div>
-                  </div>
-                  {fichaAbierta && <VitaminasSeguimiento key={pacienteSeleccionado.dni_paciente} dni={pacienteSeleccionado.dni_paciente} nombre={pacienteSeleccionado.nombre_paciente} />}
-
-                  <section className="module-patient-files order-4 xl:col-span-2 rounded-2xl border border-teal-200 bg-white p-5 md:p-6 shadow-sm" aria-label="Archivos del paciente">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div>
-                        <span className="text-[11px] uppercase tracking-wider font-extrabold text-teal-700">Documentación del paciente</span>
-                        <h3 className="m-0 mt-1 text-base font-black text-slate-900">Fotos y PDF · {adjuntos.length}/200 guardados</h3>
-                        <p className="m-0 mt-1 text-xs text-slate-500">Puede subirlos ahora, antes de registrar vitaminas o sueros. Conserva los adjuntos anteriores.</p>
-                      </div>
-                      <button type="button" onClick={() => setGaleriaAbierta(true)} className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-xs font-extrabold text-teal-900 hover:bg-teal-100">Ver archivos</button>
-                    </div>
-                    <label className="mt-4 flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-teal-300 bg-teal-50/60 p-4 text-sm font-extrabold text-teal-900 transition-colors hover:bg-teal-100">
-                      ＋ Agregar imágenes o PDF
-                      <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={subirAdjuntos} disabled={subiendoAdjuntos || cargandoAdjuntos} className="sr-only" />
-                    </label>
-                    <p className="m-0 mt-2 text-xs text-slate-500">{adjuntosPacienteCount} archivos agregados aquí · Hasta 200 por paciente · 3 MB por archivo.</p>
-                    {avanceAdjuntos && <p role="status" className="m-0 mt-2 text-xs font-bold text-teal-800">{avanceAdjuntos}</p>}
-                  </section>
-
-                  <form id="formulario-vitamina" onSubmit={handleGuardarVitamina} className="order-1 xl:col-span-2 bg-white rounded-2xl border border-teal-200 p-5 md:p-6 shadow-sm flex flex-col gap-4 scroll-mt-24 min-w-0">
+                  <form id="formulario-vitamina" onSubmit={handleGuardarVitamina} className="xl:col-span-2 bg-white rounded-2xl border border-teal-200 p-5 md:p-6 shadow-sm flex flex-col gap-4 scroll-mt-24 min-w-0">
                     <div className="bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 p-4 rounded-xl text-white flex items-center gap-3">
                       <span className="text-2xl">🧪</span>
                       <div>
@@ -802,7 +780,31 @@ function VitaminasPageContent() {
                       </button>
                     </div>
                   </form>
-                  <div className="order-5 xl:col-span-2 bg-white rounded-2xl border border-sky-200 p-5 md:p-6 shadow-sm min-w-0">
+
+                  <div className="xl:col-span-2 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm print:hidden">
+                    <div className="flex flex-wrap items-center justify-between gap-3"><div><span className="text-xs font-bold uppercase text-sky-700">Seguimiento clínico</span><h3 className="m-0 text-base font-black text-slate-900">Controles diarios y procedimientos</h3></div><button type="button" onClick={() => setFichaAbierta(prev => !prev)} className="rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-bold text-white">{fichaAbierta ? 'Cerrar ficha' : 'Abrir ficha de seguimiento'}</button></div>
+                  </div>
+                  {fichaAbierta && <VitaminasSeguimiento key={pacienteSeleccionado.dni_paciente} dni={pacienteSeleccionado.dni_paciente} nombre={pacienteSeleccionado.nombre_paciente} />}
+
+                  <section className="module-patient-files xl:col-span-2 rounded-2xl border border-teal-200 bg-white p-5 md:p-6 shadow-sm" aria-label="Archivos del paciente">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div>
+                        <span className="text-[11px] uppercase tracking-wider font-extrabold text-teal-700">Documentación del paciente</span>
+                        <h3 className="m-0 mt-1 text-base font-black text-slate-900">Fotos y PDF · {adjuntos.length}/200 guardados</h3>
+                        <p className="m-0 mt-1 text-xs text-slate-500">Puede agregar archivos del paciente y consultar los adjuntos anteriores.</p>
+                      </div>
+                      <button type="button" onClick={() => setGaleriaAbierta(true)} className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-xs font-extrabold text-teal-900 hover:bg-teal-100">Ver archivos</button>
+                    </div>
+                    <label className="mt-4 flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-teal-300 bg-teal-50/60 p-4 text-sm font-extrabold text-teal-900 transition-colors hover:bg-teal-100">
+                      ＋ Agregar imágenes o PDF
+                      <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={subirAdjuntos} disabled={subiendoAdjuntos || cargandoAdjuntos} className="sr-only" />
+                    </label>
+                    <p className="m-0 mt-2 text-xs text-slate-500">{adjuntosPacienteCount} archivos agregados aquí · Hasta 200 por paciente · 3 MB por archivo.</p>
+                    {avanceAdjuntos && <p role="status" className="m-0 mt-2 text-xs font-bold text-teal-800">{avanceAdjuntos}</p>}
+                  </section>
+
+
+                  <div className="xl:col-span-2 bg-white rounded-2xl border border-sky-200 p-5 md:p-6 shadow-sm min-w-0">
                     <h3 className="m-0 text-sm md:text-base font-extrabold text-teal-900">Historial de aplicaciones ({sesionesPaciente.length})</h3>
                     {tratamientosPaciente.length === 0 ? (
                       <p className="text-xs text-slate-500 mb-0">Este paciente aún no tiene tratamientos guardados.</p>
