@@ -45,17 +45,27 @@ function prepararApi({ fallarEnInsercion = 0 } = {}) {
   return { POST: exports.POST, operaciones, guardados };
 }
 
-const solicitud = () => new Request('https://example.test/api/vitaminas', {
+const solicitud = (fechaAplicacion) => new Request('https://example.test/api/vitaminas', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     dni_paciente: '12345678',
     nombre_paciente: 'Paciente',
+    ...(fechaAplicacion ? { fechaAplicacion } : {}),
     tratamientos: Array.from({ length: 5 }, (_, indice) => ({
       vitaminaNombre: `Vitamina ${indice + 1}`,
       dosis: `${indice + 1} ampolla(s)`, via: indice % 2 ? 'Intramuscular' : 'Intravenosa', observaciones: `Producto ${indice + 1}`
     }))
   })
+});
+
+test('conserva exactamente la hora mostrada al guardar varios productos', async () => {
+  const api = prepararApi();
+  const horaMostrada = '2026-11-10T16:32:45.000Z';
+  const respuesta = await api.POST(solicitud(horaMostrada));
+  assert.equal(respuesta.status, 201);
+  assert.equal(api.guardados.length, 5);
+  assert.ok(api.guardados.every(params => params[6].toISOString() === horaMostrada));
 });
 
 test('guarda cinco vitaminas juntas con la misma fecha y hora', async () => {

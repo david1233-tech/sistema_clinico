@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 type Control = { id: number; fecha: string; presion: string; pulso: string; saturacion: string; frecuencia_respiratoria: string; temperatura: string; peso: string; imc: string; grasa_corporal: string; grasa_visceral: string };
 type Procedimiento = { id: number; fecha: string; categoria: string; descripcion: string };
+type BorradorProcedimiento = Procedimiento & { clave_solicitud: string };
 const campos = [
   ['presion', 'P/A'], ['pulso', 'Pulso'], ['saturacion', 'Sat'], ['frecuencia_respiratoria', 'F. Resp'],
   ['temperatura', 'T°'], ['peso', 'Peso'], ['imc', 'IMC'], ['grasa_corporal', 'Grasa corporal'], ['grasa_visceral', 'Grasa visceral']
@@ -14,15 +15,14 @@ const grupos = [
 ];
 const hoy = () => { const fecha = new Date(); return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`; };
 const controlNuevo = (): Control => ({ id: 0, fecha: hoy(), presion: '', pulso: '', saturacion: '', frecuencia_respiratoria: '', temperatura: '', peso: '', imc: '', grasa_corporal: '', grasa_visceral: '' });
-const procedimientoNuevo = (): Procedimiento => ({ id: 0, fecha: hoy(), categoria: grupos[0][0], descripcion: '' });
+const procedimientoNuevo = (categoria: string): BorradorProcedimiento => ({ id: 0, fecha: hoy(), categoria, descripcion: '', clave_solicitud: crypto.randomUUID() });
 const fechaLocal = (value: string) => value?.slice(0, 10) || '';
 
 export default function VitaminasSeguimiento({ dni, nombre }: { dni: string; nombre: string }) {
   const [controles, setControles] = useState<Control[]>([]);
   const [procedimientos, setProcedimientos] = useState<Procedimiento[]>([]);
   const [control, setControl] = useState<Control>(controlNuevo);
-  const [procedimiento, setProcedimiento] = useState<Procedimiento>(procedimientoNuevo);
-  const [claveSolicitud, setClaveSolicitud] = useState(() => crypto.randomUUID());
+  const [borradores, setBorradores] = useState<Record<string, BorradorProcedimiento>>(() => Object.fromEntries(grupos.flat().map(categoria => [categoria, procedimientoNuevo(categoria)])));
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState('');
@@ -36,26 +36,38 @@ export default function VitaminasSeguimiento({ dni, nombre }: { dni: string; nom
     return () => { activo = false; };
   }, [dni]);
 
-  async function guardar(tipo: 'control' | 'procedimiento') {
-    const datos = tipo === 'control' ? control : procedimiento;
+  async function guardarControl() {
     setGuardando(true); setMensaje('');
     try {
       const respuesta = await fetch('/api/vitaminas/seguimiento', {
-        method: datos.id ? 'PUT' : 'POST',
+        method: control.id ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...datos, tipo, dni_paciente: dni, ...(tipo === 'procedimiento' ? { clave_solicitud: claveSolicitud } : {}) })
+        body: JSON.stringify({ ...control, tipo: 'control', dni_paciente: dni })
       });
       const guardado = await respuesta.json();
       if (!respuesta.ok) throw new Error(guardado.error || 'No se pudo guardar.');
-      if (tipo === 'control') {
-        setControles(prev => [guardado, ...prev.filter(item => item.id !== guardado.id)].sort((a, b) => b.fecha.localeCompare(a.fecha)));
-        setControl(controlNuevo());
-      } else {
-        setProcedimientos(prev => [guardado, ...prev.filter(item => item.id !== guardado.id)].sort((a, b) => b.fecha.localeCompare(a.fecha)));
-        setProcedimiento(procedimientoNuevo());
-        setClaveSolicitud(crypto.randomUUID());
-      }
+      setControles(prev => [guardado, ...prev.filter(item => item.id !== guardado.id)].sort((a, b) => b.fecha.localeCompare(a.fecha)));
+      setControl(controlNuevo());
       setMensaje('Ficha guardada correctamente.');
+    } catch (error) { setMensaje(error instanceof Error ? error.message : 'No se pudo guardar.'); }
+    finally { setGuardando(false); }
+  }
+
+  async function guardarProcedimiento(categoria: string) {
+    const borrador = borradores[categoria];
+    if (!borrador.fecha || !borrador.descripcion.trim()) return;
+    setGuardando(true); setMensaje('');
+    try {
+      const respuesta = await fetch('/api/vitaminas/seguimiento', {
+        method: borrador.id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...borrador, tipo: 'procedimiento', dni_paciente: dni })
+      });
+      const guardado = await respuesta.json();
+      if (!respuesta.ok) throw new Error(guardado.error || 'No se pudo guardar.');
+      setProcedimientos(prev => [guardado, ...prev.filter(item => item.id !== guardado.id)].sort((a, b) => b.fecha.localeCompare(a.fecha)));
+      setBorradores(prev => ({ ...prev, [categoria]: procedimientoNuevo(categoria) }));
+      setMensaje(`${categoria}: registro guardado correctamente.`);
     } catch (error) { setMensaje(error instanceof Error ? error.message : 'No se pudo guardar.'); }
     finally { setGuardando(false); }
   }
@@ -73,13 +85,15 @@ export default function VitaminasSeguimiento({ dni, nombre }: { dni: string; nom
       <div className="mt-5"><div className="mb-2 flex items-center justify-between"><h4 className="m-0 text-base font-extrabold text-sky-900">Registro diario</h4><button type="button" onClick={() => setControl(controlNuevo())} className="text-sm font-bold text-sky-700 print:hidden">＋ Agregar registro diario</button></div>
         <div className="overflow-x-auto rounded-lg border border-sky-200"><table className="w-full min-w-[1120px] border-collapse text-left text-xs"><thead className="bg-sky-100 text-sky-950"><tr><th className="border border-sky-200 p-2">FECHA</th>{campos.map(([, titulo]) => <th key={titulo} className="border border-sky-200 p-2">{titulo}</th>)}<th className="border border-sky-200 p-2 print:hidden">Acción</th></tr></thead><tbody>
           {controles.map(item => <tr key={item.id}><td className="border border-sky-100 p-2">{fechaLocal(item.fecha)}</td>{campos.map(([campo]) => <td key={campo} className="border border-sky-100 p-2">{item[campo] || '—'}</td>)}<td className="border border-sky-100 p-2 print:hidden"><button type="button" onClick={() => setControl({ ...item, fecha: fechaLocal(item.fecha) })} className="font-bold text-sky-700">Editar</button></td></tr>)}
-          <tr className="bg-sky-50/60 print:hidden"><td className="border border-sky-100 p-1"><input aria-label="Fecha del control" type="date" required value={control.fecha} onChange={e => setControl({ ...control, fecha: e.target.value })} className={entrada} /></td>{campos.map(([campo, titulo]) => <td key={campo} className="border border-sky-100 p-1"><input aria-label={titulo} value={control[campo]} maxLength={30} onChange={e => setControl({ ...control, [campo]: e.target.value })} className={entrada} /></td>)}<td className="border border-sky-100 p-1"><button type="button" disabled={guardando || !control.fecha} onClick={() => guardar('control')} className={boton}>{guardando ? 'Guardando...' : control.id ? 'Guardar cambios' : 'Guardar ficha'}</button></td></tr>
+          <tr className="bg-sky-50/60 print:hidden"><td className="border border-sky-100 p-1"><input aria-label="Fecha del control" type="date" required value={control.fecha} onChange={e => setControl({ ...control, fecha: e.target.value })} className={entrada} /></td>{campos.map(([campo, titulo]) => <td key={campo} className="border border-sky-100 p-1"><input aria-label={titulo} value={control[campo]} maxLength={30} onChange={e => setControl({ ...control, [campo]: e.target.value })} className={entrada} /></td>)}<td className="border border-sky-100 p-1"><button type="button" disabled={guardando || !control.fecha} onClick={guardarControl} className={boton}>{guardando ? 'Guardando...' : control.id ? 'Guardar cambios' : 'Guardar ficha'}</button></td></tr>
         </tbody></table></div>
       </div>
-      <div className="mt-6"><div className="mb-3 flex items-center justify-between"><h4 className="m-0 text-base font-extrabold text-sky-900">Tratamientos realizados</h4><button type="button" onClick={() => setProcedimiento(procedimientoNuevo())} className="text-sm font-bold text-sky-700 print:hidden">＋ Agregar tratamiento</button></div>
-        <div className="grid gap-3 md:grid-cols-2">{grupos.map((grupo, indice) => <div key={indice} className="space-y-3">{grupo.map(categoria => <div key={categoria} className="rounded-lg border border-sky-200 p-3"><h5 className="m-0 text-sm font-extrabold text-sky-900">{categoria}</h5>{procedimientos.filter(item => item.categoria === categoria).map(item => <div key={item.id} className="mt-2 border-t border-sky-100 pt-2 text-sm"><time className="font-bold text-slate-700">{fechaLocal(item.fecha)}</time><p className="m-0 whitespace-pre-wrap text-slate-700">{item.descripcion}</p><button type="button" onClick={() => setProcedimiento({ ...item, fecha: fechaLocal(item.fecha) })} className="mt-1 text-xs font-bold text-sky-700 print:hidden">Editar registro</button></div>)}</div>)}</div>)}</div>
+      <div className="mt-6"><h4 className="m-0 mb-3 text-base font-extrabold text-sky-900">Tratamientos realizados</h4>
+        <div className="grid gap-3 md:grid-cols-2">{grupos.map((grupo, indice) => <div key={indice} className="space-y-3">{grupo.map(categoria => {
+          const borrador = borradores[categoria];
+          return <div key={categoria} className="rounded-lg border border-sky-200 p-3"><div className="grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_150px]"><h5 className="m-0 text-sm font-extrabold text-sky-900">{categoria}</h5><input type="date" aria-label={`Fecha de ${categoria}`} value={borrador.fecha} onChange={event => setBorradores(prev => ({ ...prev, [categoria]: { ...prev[categoria], fecha: event.target.value } }))} className={`${entrada} print:border-slate-400`} /></div><textarea aria-label={`Descripción de ${categoria}`} value={borrador.descripcion} onChange={event => setBorradores(prev => ({ ...prev, [categoria]: { ...prev[categoria], descripcion: event.target.value } }))} maxLength={5000} rows={2} placeholder={`Describa ${categoria.toLowerCase()}...`} className={`${entrada} mt-2 resize-y print:border-slate-400`} /><div className="mt-2 flex flex-wrap items-center gap-3 print:hidden"><button type="button" onClick={() => guardarProcedimiento(categoria)} disabled={guardando || !borrador.fecha || !borrador.descripcion.trim()} className={boton}>{guardando ? 'Guardando...' : borrador.id ? 'Guardar cambios' : 'Guardar tratamiento'}</button>{borrador.id > 0 && <button type="button" onClick={() => setBorradores(prev => ({ ...prev, [categoria]: procedimientoNuevo(categoria) }))} className="text-xs font-bold text-slate-600">Cancelar edición</button>}</div>{procedimientos.filter(item => item.categoria === categoria).map(item => <div key={item.id} className="mt-3 border-t border-sky-100 pt-2 text-sm"><time className="font-bold text-slate-700">{fechaLocal(item.fecha)}</time><p className="m-0 whitespace-pre-wrap text-slate-700">{item.descripcion}</p><button type="button" onClick={() => setBorradores(prev => ({ ...prev, [categoria]: { ...item, fecha: fechaLocal(item.fecha), clave_solicitud: crypto.randomUUID() } }))} className="mt-1 text-xs font-bold text-sky-700 print:hidden">Editar registro</button></div>)}</div>;
+        })}</div>)}</div>
       </div>
-      <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 print:hidden"><h5 className="m-0 mb-3 text-sm font-extrabold text-sky-900">{procedimiento.id ? 'Editar tratamiento' : 'Nuevo tratamiento'}</h5><div className="grid gap-3 md:grid-cols-[1fr_180px]"><label className="text-xs font-bold text-slate-700">Categoría<select value={procedimiento.categoria} onChange={e => setProcedimiento({ ...procedimiento, categoria: e.target.value })} className={entrada}>{grupos.flat().map(item => <option key={item}>{item}</option>)}</select></label><label className="text-xs font-bold text-slate-700">Fecha<input type="date" value={procedimiento.fecha} onChange={e => setProcedimiento({ ...procedimiento, fecha: e.target.value })} className={entrada} /></label></div><label className="mt-3 block text-xs font-bold text-slate-700">Descripción del procedimiento<textarea value={procedimiento.descripcion} onChange={e => setProcedimiento({ ...procedimiento, descripcion: e.target.value })} maxLength={5000} rows={3} className={entrada} placeholder="Procedimiento, dosis o evolución observada" /></label><button type="button" onClick={() => guardar('procedimiento')} disabled={guardando || !procedimiento.fecha || !procedimiento.descripcion.trim()} className={`${boton} mt-3`}>{guardando ? 'Guardando...' : procedimiento.id ? 'Guardar cambios' : 'Guardar ficha'}</button></div>
     </>}
   </section>;
 }

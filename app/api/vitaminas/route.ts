@@ -100,11 +100,15 @@ export async function POST(request: Request) {
     item.vitaminaNombre.length > 200 || item.dosis.length > 100 || item.via.length > 100)) {
     return NextResponse.json({ error: 'Complete nombre, dosis y vía de cada vitamina o suero y revise la longitud de los datos.' }, { status: 400 });
   }
+  const fechaSolicitada = body.fechaAplicacion;
+  if (fechaSolicitada !== undefined && (typeof fechaSolicitada !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(fechaSolicitada) || Number.isNaN(Date.parse(fechaSolicitada)))) {
+    return NextResponse.json({ error: 'Fecha y hora de aplicación inválidas.' }, { status: 400 });
+  }
   try {
     const columnas = await asegurarTablaRecetas();
     const cliente = await pgPool.connect();
     try {
-      const fechaComun = new Date();
+      const fechaComun = fechaSolicitada ? new Date(fechaSolicitada as string) : new Date();
       const guardados = [];
       await cliente.query('BEGIN');
       for (const item of aplicaciones) {

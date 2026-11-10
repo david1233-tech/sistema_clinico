@@ -204,6 +204,7 @@ function VitaminasPageContent() {
   const [busqueda, setBusqueda] = useState<string>('');
   const [letraNombre, setLetraNombre] = useState('');
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
+  const [fechaMostrada, setFechaMostrada] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [errorPacientes, setErrorPacientes] = useState('');
   const [saving, setSaving] = useState<boolean>(false);
@@ -243,7 +244,14 @@ function VitaminasPageContent() {
       }
     }
     setPacienteSeleccionado(pacientes.find(p => p.dni_paciente === dniTarget) || pacientes[0]);
+    setFechaMostrada(new Date().toISOString());
   }, [dniParam, pacientes, pacienteSeleccionado]);
+
+  useEffect(() => {
+    if (!pacienteSeleccionado || saving) return;
+    const reloj = window.setInterval(() => setFechaMostrada(new Date().toISOString()), 1000);
+    return () => window.clearInterval(reloj);
+  }, [pacienteSeleccionado?.dni_paciente, saving]);
 
   useEffect(() => {
     const dni = pacienteSeleccionado?.dni_paciente;
@@ -353,6 +361,7 @@ function VitaminasPageContent() {
     if ((registroEditando || Object.values(formVitamina).some(Boolean) || vitaminasAdicionales.length > 0) &&
       !confirm('Los datos del formulario que aún no guardó se perderán. ¿Cambiar de paciente?')) return;
     setPacienteSeleccionado(p);
+    setFechaMostrada(new Date().toISOString());
     setGaleriaAbierta(false);
     setFichaAbierta(false);
     setRegistroEditando(null);
@@ -415,6 +424,7 @@ function VitaminasPageContent() {
       alert('Complete el nombre, la dosis y la vía de cada vitamina o suero.');
       return;
     }
+    const fechaCapturada = fechaMostrada || new Date().toISOString();
     try {
       setSaving(true);
       const response = await fetch('/api/vitaminas', {
@@ -424,6 +434,7 @@ function VitaminasPageContent() {
           ...aplicaciones[0],
           dni_paciente: pacienteSeleccionado.dni_paciente,
           nombre_paciente: pacienteSeleccionado.nombre_paciente,
+          ...(!registroEditando ? { fechaAplicacion: fechaCapturada } : {}),
           ...(registroEditando ? { id: registroEditando.id } : { tratamientos: aplicaciones })
         })
       });
@@ -443,6 +454,7 @@ function VitaminasPageContent() {
       setPacienteSeleccionado(prev => prev?.dni_paciente === pacienteSeleccionado.dni_paciente ? actualizarResumenPaciente(prev, listaActualizada) : prev);
       setRegistroEditando(null);
       handleLimpiarFormulario();
+      setFechaMostrada(new Date().toISOString());
       alert(registroEditando ? '✅ Tratamiento actualizado.' : `✅ ${aplicaciones.length} ${aplicaciones.length === 1 ? 'tratamiento guardado' : 'tratamientos guardados'} para ${pacienteSeleccionado.nombre_paciente || pacienteSeleccionado.dni_paciente}`);
     } catch (err) {
       console.error('Error guardando vitamina:', err);
@@ -705,6 +717,9 @@ function VitaminasPageContent() {
                         <span className="text-xs text-slate-500 font-bold">
                           DNI: {pacienteSeleccionado.dni_paciente} {pacienteSeleccionado.edad ? `• ${pacienteSeleccionado.edad} años` : ''}
                         </span>
+                        <p className="m-0 mt-2 inline-flex rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-900" aria-live="off">
+                          Hora de aplicación: {fechaMostrada ? new Date(fechaMostrada).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'medium' }) : 'Cargando hora...'}
+                        </p>
                       </div>
                       {pacienteSeleccionado.aplicaVitamina && (
                         <div className="flex flex-wrap items-center gap-2">
@@ -755,15 +770,15 @@ function VitaminasPageContent() {
                     <div className="bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 p-4 rounded-xl text-white flex items-center gap-3">
                       <span className="text-2xl">🧪</span>
                       <div>
-                        <h3 className="m-0 text-sm md:text-base font-extrabold text-white">{registroEditando ? 'Editar vitamina o suero guardado' : 'Especificación de Vitaminas e Inyectables'}</h3>
+                        <h3 className="m-0 text-sm md:text-base font-extrabold text-white">{registroEditando ? 'Editar vitamina o suero guardado' : 'Vitaminas y sueros aplicados'}</h3>
                         <p className="m-0 text-xs text-teal-100">{registroEditando ? 'Los cambios se aplicarán solo a este registro.' : 'Elija o escriba el producto; después complete los datos de aplicación.'}</p>
                       </div>
                     </div>
                     <p className="m-0 text-xs text-slate-600">Busque en el catálogo a la izquierda o escriba el nombre a la derecha. Cada producto conserva su propia dosis, vía y observaciones.</p>
                     <ProductoAplicado key={formVersion} item={formVitamina} numero={1} onChange={setFormVitamina} />
                     {vitaminasAdicionales.map((item, indice) => <ProductoAplicado key={item.id} item={item} numero={indice + 2} onChange={actualizado => setVitaminasAdicionales(prev => prev.map(v => v.id === actualizado.id ? actualizado : v))} onRemove={() => setVitaminasAdicionales(prev => prev.filter(v => v.id !== item.id))} />)}
-                    {!registroEditando && <button type="button" onClick={handleAgregarVitamina} disabled={saving || vitaminasAdicionales.length >= 49} className="self-start rounded-xl border border-sky-300 bg-sky-50 px-4 py-3 text-sm font-extrabold text-sky-800 hover:bg-sky-100 disabled:opacity-50">＋ Agregar otra vitamina o suero</button>}
-                    <p className="m-0 text-xs font-semibold text-slate-600">Al guardar, todos los productos de esta aplicación compartirán la fecha y hora actuales.</p>
+                    {!registroEditando && <button type="button" onClick={handleAgregarVitamina} disabled={saving || vitaminasAdicionales.length >= 49} className="w-full rounded-2xl border-2 border-dashed border-sky-400 bg-sky-50 px-5 py-5 text-center text-sm font-black text-sky-900 shadow-sm hover:bg-sky-100 disabled:opacity-50">＋ Agregar nueva vitamina o suero</button>}
+                    <p className="m-0 text-xs font-semibold text-slate-600">{registroEditando ? 'La edición conserva la fecha y hora originales del registro.' : 'Al guardar, todos los productos se registrarán con la fecha y hora mostradas junto al paciente.'}</p>
                     <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
                       <button
                         type="button"
