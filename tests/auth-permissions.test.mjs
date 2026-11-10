@@ -30,3 +30,8 @@ test('la sesión firmada conserva el rol limitado', () => {
   assert.equal(readSession(token, secret)?.role, 'operador');
   assert.equal(readSession(token, 'otra-clave'), null);
 });
+
+test('recepción puede consultar vitaminas sin acceder a su edición', () => {
+  assert.equal(allows('recepcion', '/api/recetas', 'GET'), true);
+  assert.equal(allows('recepcion', '/api/recetas', 'POST'), false);
+});

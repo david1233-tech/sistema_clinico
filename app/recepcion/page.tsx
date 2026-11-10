@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar';
 import NuevoPacienteModal from '@/components/NuevoPacienteModal';
 import BotonSeleccionarPaciente from '@/components/BotonSeleccionarPaciente';
 import { primerApellido } from '@/lib/busqueda-pacientes';
+import { agruparSesiones } from '@/lib/vitaminas-sesiones';
 
 type EdicionPaciente = {
   dni: string;
@@ -28,12 +29,14 @@ const normalizarBusqueda = (texto: string) => texto.normalize('NFD').replace(/[\
 function RecepcionPageContent() {
   const searchParams = useSearchParams();
   const dniParam = searchParams.get('dni');
+  const vistaVitaminas = searchParams.get('vista') === 'vitaminas';
   const busquedaParam = searchParams.get('buscar')?.trim() || '';
   const dniBuscado = dniParam ? dniParam.replace(/\D/g, '').trim() : /^\d{8}$/.test(busquedaParam) ? busquedaParam : '';
   const [paciente, setPaciente] = useState<any>(null);
   const [triajes, setTriajes] = useState<any[]>([]);
   const [consultas, setConsultas] = useState<any[]>([]);
   const [tratamientos, setTratamientos] = useState<any[]>([]);
+  const [errorVitaminas, setErrorVitaminas] = useState('');
   const [pacientesRegistrados, setPacientesRegistrados] = useState<PacienteRecepcion[]>([]);
   const [filtroPacientes, setFiltroPacientes] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -46,7 +49,7 @@ function RecepcionPageContent() {
   const [mostrarModalImagen, setMostrarModalImagen] = useState<boolean>(false);
   const [consultaImprimir, setConsultaImprimir] = useState<any>(null);
   const [tipoImpresion, setTipoImpresion] = useState<'receta' | 'historial'>('receta');
-  const [tabActiva, setTabActiva] = useState<'resumen' | 'imagen' | 'consultas'>('resumen');
+  const [tabActiva, setTabActiva] = useState<'resumen' | 'imagen' | 'consultas' | 'vitaminas'>(vistaVitaminas ? 'vitaminas' : 'resumen');
   const [consultasDesplegadas, setConsultasDesplegadas] = useState<boolean>(true);
 
   useEffect(() => {
@@ -56,6 +59,8 @@ function RecepcionPageContent() {
   const fetchDatosRecepcion = async () => {
     try {
       setLoading(true);
+      setTratamientos([]);
+      setErrorVitaminas('');
       
       let dataTodos: any[] = [];
       try {
@@ -111,8 +116,9 @@ function RecepcionPageContent() {
 
           try {
             const resRecetas = await fetch(`/api/recetas?dni=${dniFinal}`);
-            if (resRecetas.ok) setTratamientos(await resRecetas.json());
-          } catch (e) {}
+            if (!resRecetas.ok) throw new Error('No se pudo cargar el historial de vitaminas.');
+            setTratamientos(await resRecetas.json());
+          } catch (e) { setErrorVitaminas(e instanceof Error ? e.message : 'No se pudo cargar el historial de vitaminas.'); }
 
         } else {
           setPaciente(null);
@@ -234,6 +240,14 @@ function RecepcionPageContent() {
     return normalizarBusqueda(nombre).includes(filtroNormalizado) ||
       String(p.dni || p.dni_paciente || '').includes(filtroNormalizado);
   });
+  const sesionesVitaminas = agruparSesiones(tratamientos.map((item: Record<string, unknown>) => ({
+    id: Number(item.id),
+    vitaminaNombre: String(item.vitaminaNombre ?? item.vitaminanombre ?? item.medicamento ?? 'Vitamina o suero'),
+    dosis: String(item.dosis ?? ''),
+    via: String(item.via ?? ''),
+    observaciones: String(item.observaciones ?? ''),
+    fechaAplicacion: String(item.fechaAplicacion ?? item.fechaaplicacion ?? item.fecha_aplicacion ?? '')
+  })).filter(item => Number.isSafeInteger(item.id) && item.id > 0));
 
   return (
     <div className="module-shell flex min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -399,6 +413,7 @@ function RecepcionPageContent() {
                   >
                     ✏️ Editar paciente
                   </button>
+                  <a href={`/recepcion?dni=${encodeURIComponent(paciente.dni || paciente.dni_paciente)}&vista=vitaminas`} className="px-4 py-2.5 rounded-xl border border-sky-200 bg-sky-50 text-sky-800 font-extrabold text-xs no-underline">💉 Muestra de vitaminas</a>
                   <button
                     type="button"
                     onClick={() => handleImprimirRecetaIndividual(consultas.length > 0 ? consultas[0] : null)}
@@ -471,6 +486,7 @@ function RecepcionPageContent() {
                 >
                   🩺 Historial de Consultas & Acciones
                 </button>
+                <button type="button" onClick={() => setTabActiva('vitaminas')} className={`px-4 py-2 rounded-xl font-extrabold text-xs cursor-pointer transition-all ${tabActiva === 'vitaminas' ? 'bg-sky-700 text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>💉 Muestra de vitaminas</button>
               </div>
 
               {/* CONTENIDO DE LA OPCIÓN 1: LOS 3 PRIMEROS CUADROS */}
@@ -604,6 +620,13 @@ function RecepcionPageContent() {
                   </div>
                 </div>
               )}
+              {tabActiva === 'vitaminas' && (
+                <section className="rounded-2xl border border-sky-200 bg-sky-50/50 p-4 sm:p-6" aria-label="Muestra de vitaminas del paciente">
+                  <h3 className="m-0 text-lg font-extrabold text-sky-900">Vitaminas y sueros aplicados</h3>
+                  <p className="m-0 mt-1 text-xs text-slate-600">{paciente.nombre} · DNI {paciente.dni || paciente.dni_paciente} · Una tarjeta por fecha de aplicación</p>
+                  {errorVitaminas ? <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-white p-4 text-sm text-rose-700">{errorVitaminas}</p> : sesionesVitaminas.length === 0 ? <p className="mt-4 rounded-xl border border-sky-200 bg-white p-4 text-sm text-slate-600">Este paciente aún no tiene vitaminas o sueros registrados.</p> : <div className="mt-4 grid gap-4 md:grid-cols-2">{sesionesVitaminas.map(([dia, aplicaciones]) => <article key={dia} className="rounded-xl border border-sky-200 bg-white p-4 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-100 pb-2"><strong className="text-sm text-sky-900">Fecha: {dia.startsWith('registro-') ? 'Sin fecha' : dia.split('-').reverse().join('/')}</strong><span className="text-xs font-semibold text-slate-600">{aplicaciones.length} {aplicaciones.length === 1 ? 'producto' : 'productos'}</span></div><div className="mt-3 space-y-3">{aplicaciones.map(item => <div key={item.id} className="border-t border-sky-100 pt-3 first:border-t-0 first:pt-0 text-xs text-slate-700"><strong className="block text-sm text-slate-900">{item.vitaminaNombre}</strong><span className="block mt-1">Dosis: {item.dosis || 'Sin dato'} · Vía: {item.via || 'Sin dato'}</span>{item.fechaAplicacion && !Number.isNaN(new Date(item.fechaAplicacion).getTime()) && <span className="block mt-1">Hora: {new Date(item.fechaAplicacion).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' })}</span>}{item.observaciones && <p className="m-0 mt-1 whitespace-pre-wrap">{item.observaciones}</p>}</div>)}</div></article>)}</div>}
+                </section>
+              )}
             </div>
           )}
 
@@ -649,6 +672,7 @@ function RecepcionPageContent() {
                       <a href={`/recepcion?dni=${p.dni || p.dni_paciente}`} className="px-3 py-2 bg-sky-50 text-sky-700 border border-sky-200 rounded-xl font-extrabold text-xs no-underline">📄 Expediente</a>
                       <a href={`/enfermeria?dni=${p.dni || p.dni_paciente}`} className="px-3 py-2 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl font-extrabold text-xs no-underline">🩺 Triaje</a>
                       <button type="button" onClick={() => iniciarEdicionPaciente(p)} className="px-3 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl font-extrabold text-xs">✏️ Editar</button>
+                      <a href={`/recepcion?dni=${encodeURIComponent(p.dni || p.dni_paciente || '')}&vista=vitaminas`} className="px-3 py-2 bg-sky-50 text-sky-800 border border-sky-200 rounded-xl font-extrabold text-xs no-underline">💉 Muestra de vitaminas</a>
                       <button type="button" onClick={() => handleEliminarPaciente(p)} className="px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-extrabold text-xs" aria-label={`Eliminar ${p.nombre}`}>🗑️</button>
                     </div>
                   </article>)}
@@ -856,4 +880,3 @@ export default function RecepcionPage() {
     </Suspense>
   );
 }
-

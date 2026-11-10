@@ -805,7 +805,7 @@ function VitaminasPageContent() {
 
 
                   <div className="xl:col-span-2 bg-white rounded-2xl border border-sky-200 p-5 md:p-6 shadow-sm min-w-0">
-                    <h3 className="m-0 text-sm md:text-base font-extrabold text-teal-900">Historial de aplicaciones ({sesionesPaciente.length})</h3>
+                    <h3 className="m-0 text-sm md:text-base font-extrabold text-teal-900">Historial de vitaminas por fecha ({sesionesPaciente.length})</h3>
                     {tratamientosPaciente.length === 0 ? (
                       <p className="text-xs text-slate-500 mb-0">Este paciente aún no tiene tratamientos guardados.</p>
                     ) : (
@@ -813,12 +813,13 @@ function VitaminasPageContent() {
                         {sesionesPaciente.map(([clave, registros], indice) => (
                           <article key={clave} className="rounded-2xl border border-teal-100 bg-slate-50/70 p-4 text-xs md:text-sm break-words shadow-sm">
                             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3 mb-3">
-                              <div><span className="block text-[10px] uppercase tracking-wider font-extrabold text-teal-700">Aplicación {sesionesPaciente.length - indice}</span><strong className="text-slate-900">{registros.length} {registros.length === 1 ? 'vitamina o suero' : 'vitaminas o sueros'}</strong></div>
-                              <time className="text-slate-600 font-semibold">{registros[0].fechaAplicacion ? new Date(registros[0].fechaAplicacion).toLocaleString('es-PE') : 'Sin fecha'}</time>
+                              <div><span className="block text-[10px] uppercase tracking-wider font-extrabold text-teal-700">Registro del día {sesionesPaciente.length - indice}</span><strong className="text-slate-900">{registros.length} {registros.length === 1 ? 'vitamina o suero' : 'vitaminas o sueros'}</strong></div>
+                              <time className="text-slate-600 font-semibold">Fecha: {clave.startsWith('registro-') ? 'Sin fecha' : clave.split('-').reverse().join('/')}</time>
                             </div>
                             <div className="space-y-3">
-                              {registros.map(t => <div key={t.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                              {registros.map(t => <div key={t.id} className="border-t border-slate-200 pt-3 first:border-t-0 first:pt-0">
                                 <strong className="block text-teal-900">{t.vitaminaNombre}</strong>
+                                {t.fechaAplicacion && <span className="mt-1 block text-xs font-semibold text-slate-500">Hora: {new Date(t.fechaAplicacion).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' })}</span>}
                                 <p className="m-0 mt-1"><strong>Dosis:</strong> {t.dosis || 'No registrada'} · <strong>Vía:</strong> {t.via || 'No registrada'}</p>
                                 {t.observaciones && <p className="m-0 mt-1 whitespace-pre-wrap"><strong>Observaciones:</strong> {t.observaciones}</p>}
                                 <div className="flex flex-wrap gap-2 mt-2">
