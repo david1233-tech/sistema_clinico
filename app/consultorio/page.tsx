@@ -39,6 +39,22 @@ interface ConsultaGuardada {
   imagen_url?: string;
 }
 interface AdjuntoConsulta { id: number; nombre: string; tipo: string; fecha: string }
+const MAX_ARCHIVO_CONSULTA = 3 * 1024 * 1024;
+
+async function prepararFotoConsulta(archivo: File): Promise<File> {
+  if (!archivo.type.startsWith('image/') || archivo.size <= MAX_ARCHIVO_CONSULTA) return archivo;
+  const imagen = await createImageBitmap(archivo);
+  try {
+    const escala = Math.min(1, 1800 / Math.max(imagen.width, imagen.height));
+    const lienzo = document.createElement('canvas');
+    lienzo.width = Math.round(imagen.width * escala);
+    lienzo.height = Math.round(imagen.height * escala);
+    lienzo.getContext('2d')?.drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
+    const blob = await new Promise<Blob | null>(resolve => lienzo.toBlob(resolve, 'image/jpeg', 0.78));
+    if (!blob) throw new Error('No se pudo preparar la foto');
+    return new File([blob], archivo.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+  } finally { imagen.close(); }
+}
 const DIETAS_VITAL_SALUD = [
   {
     nombre: '🚫 DIABETES',
@@ -473,6 +489,7 @@ function ConsultorioPageContent() {
   const [consultaPendienteId, setConsultaPendienteId] = useState<string | number | null>(null);
   const [cargandoCarpeta, setCargandoCarpeta] = useState(false);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [pdfConsultaId, setPdfConsultaId] = useState<string | number | null>(null);
   
   const [consulta, setConsulta] = useState({
     motivo: '',
@@ -635,13 +652,16 @@ function ConsultorioPageContent() {
     }
   };
 
-  const handleImagenUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+  const handleImagenUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const originales = Array.from(e.target.files || []);
+    e.target.value = '';
+    let files: File[];
+    try { files = await Promise.all(originales.map(prepararFotoConsulta)); }
+    catch { alert('No se pudo preparar la foto. Intenta otra imagen.'); return; }
     if (archivosPendientes.length + files.length > 50) alert('Se permiten hasta 50 adjuntos por consulta.');
-    else if (files.some(file => file.size === 0 || file.size > 3 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'].includes(file.type))) {
+    else if (files.some(file => file.size === 0 || file.size > MAX_ARCHIVO_CONSULTA || !['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'].includes(file.type))) {
       alert('Solo imágenes JPG, PNG, WebP, GIF o PDF de hasta 3 MB por archivo.');
     } else setArchivosPendientes(prev => [...prev, ...files]);
-    e.target.value = '';
   };
 
   const cargarAdjuntosConsulta = async (id: string | number) => {
@@ -673,11 +693,14 @@ function ConsultorioPageContent() {
   };
 
   const handleAgregarHistorial = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+    const originales = Array.from(e.target.files || []);
     e.target.value = '';
+    let files: File[];
+    try { files = await Promise.all(originales.map(prepararFotoConsulta)); }
+    catch { alert('No se pudo preparar la foto. Intenta otra imagen.'); return; }
     if (!carpetaConsulta || files.length === 0) return;
     if (adjuntosCarpeta.length + files.length > 50) { alert('Se permiten hasta 50 adjuntos por consulta.'); return; }
-    if (files.some(file => file.size === 0 || file.size > 3 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'].includes(file.type))) {
+    if (files.some(file => file.size === 0 || file.size > MAX_ARCHIVO_CONSULTA || !['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'].includes(file.type))) {
       alert('Solo imágenes JPG, PNG, WebP, GIF o PDF de hasta 3 MB por archivo.'); return;
     }
     setCargandoCarpeta(true);
@@ -738,9 +761,9 @@ function ConsultorioPageContent() {
       setSaving(true);
       const dni = pacienteSeleccionado.dni_paciente || pacienteSeleccionado.dni || '';
       const nuevaConsulta: ConsultaGuardada = {
-        id: Date.now(),
+        id: 0,
         dni_paciente: dni,
-        fecha: new Date().toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }),
+        fecha: new Date().toISOString(),
         motivo: consulta.motivo,
         diagnostico: consulta.diagnostico,
         receta: consulta.receta,
@@ -764,6 +787,7 @@ function ConsultorioPageContent() {
         setArchivosPendientes(prev => prev.filter(item => item !== archivo));
       }
       await cargarHistorialPaciente(dni);
+      setPdfConsultaId(id);
       alert(`✅ Consulta y dieta guardadas con éxito para ${pacienteSeleccionado.nombre_paciente || dni}`);
       setConsulta({ motivo: '', diagnostico: '', receta: '', dieta: '', imagen_url: '' });
       setArchivosPendientes([]);
@@ -894,7 +918,7 @@ function ConsultorioPageContent() {
                             {historialConsultas.map((h, i) => (
                               <div key={h.id || i} className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs flex flex-col gap-1">
                                 <div className="flex justify-between items-center">
-                                  <span className="font-bold text-teal-700">📅 {h.fecha}</span>
+                                  <span className="font-bold text-teal-700">📅 {h.fecha && !Number.isNaN(new Date(h.fecha).getTime()) ? new Date(h.fecha).toLocaleString('es-PE', { timeZone: 'America/Lima', dateStyle: 'short', timeStyle: 'short' }) : h.fecha}</span>
                                   <button
                                     type="button"
                                     onClick={() => handleEliminarConsultaHistorial(h)}
@@ -910,6 +934,7 @@ function ConsultorioPageContent() {
                                 <button type="button" onClick={() => abrirCarpeta(h)} className="mt-1 px-2.5 py-1.5 bg-teal-50 text-teal-800 border border-teal-200 rounded-lg font-bold text-[11px] cursor-pointer hover:bg-teal-100 text-left w-fit">
                                   📁 Abrir carpeta de fotos y exámenes
                                 </button>
+                                <button type="button" onClick={() => setPdfConsultaId(h.id)} className="mt-1 px-2.5 py-1.5 bg-sky-50 text-sky-800 border border-sky-200 rounded-lg font-bold text-[11px] cursor-pointer hover:bg-sky-100 text-left w-fit">📄 Ver / imprimir ficha PDF</button>
                               </div>
                             ))}
                           </div>
@@ -996,14 +1021,15 @@ function ConsultorioPageContent() {
                       <label className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
                         📁 FOTOS Y EXÁMENES CLÍNICOS DE ESTA CONSULTA
                       </label>
-                      <input
+                      <div className="flex flex-wrap items-center gap-3"><input
                         type="file"
                         accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
                         multiple
                         onChange={handleImagenUpload}
                         className="text-xs font-bold text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer"
-                      />
+                      /><label className="cursor-pointer rounded-xl border border-sky-200 bg-white px-4 py-2 text-xs font-bold text-sky-800 hover:bg-sky-50">📷 Usar cámara<input type="file" accept="image/*" capture="environment" onChange={handleImagenUpload} className="sr-only" /></label></div>
                       <p className="m-0 text-xs text-slate-600">Hasta 50 imágenes o PDF de 3 MB cada uno. Se guardan con la consulta.</p>
+                      {archivosPendientes.length > 0 && <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{archivosPendientes.map((archivo, index) => <div key={`${archivo.name}-${index}`} className="rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-700"><span className="block truncate">{archivo.type.startsWith('image/') ? '🖼️' : '📄'} {archivo.name}</span><span className="text-slate-500">Pendiente de guardar</span></div>)}</div>}
                       <button type="button" onClick={() => abrirCarpeta(null)} className="bg-white border border-teal-200 rounded-xl p-3 text-left text-sm font-bold text-teal-900 hover:bg-teal-50 cursor-pointer">
                         📁 Abrir carpeta de adjuntos ({archivosPendientes.length}/50)
                       </button>
@@ -1048,6 +1074,7 @@ function ConsultorioPageContent() {
             {carpetaConsulta && <div className="mb-3">
               <label className="block text-xs font-bold text-teal-800 mb-1">Agregar fotos o PDF a esta consulta ({adjuntosCarpeta.length}/50)</label>
               <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={handleAgregarHistorial} disabled={cargandoCarpeta} className="text-xs max-w-full" />
+              <label className="ml-2 inline-block cursor-pointer rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800">📷 Usar cámara<input type="file" accept="image/*" capture="environment" onChange={handleAgregarHistorial} disabled={cargandoCarpeta} className="sr-only" /></label>
             </div>}
             {cargandoCarpeta && <p className="text-xs text-slate-500">Cargando archivos...</p>}
             {!cargandoCarpeta && adjuntosCarpeta.length + (carpetaConsulta ? 0 : archivosPendientes.length) + (carpetaConsulta?.imagen_url ? 1 : 0) === 0 && <p className="text-sm text-slate-500">Esta carpeta está vacía.</p>}
@@ -1057,7 +1084,9 @@ function ConsultorioPageContent() {
                 <button type="button" className="text-teal-800 font-bold" onClick={() => abrirVisorZoom(carpetaConsulta.imagen_url!)}>Abrir</button>
               </div>}
               {adjuntosCarpeta.map(item => <div key={item.id} className="flex items-center gap-2 p-2 border rounded-lg text-sm">
+                {item.tipo.startsWith('image/') && <img src={`/api/consulta/adjuntos/${item.id}`} alt={item.nombre} className="h-12 w-12 rounded object-cover" />}
                 <span className="truncate flex-1">{item.tipo.startsWith('image/') ? '🖼️' : '📄'} {item.nombre}</span>
+                <span className="text-[10px] text-slate-500">{new Date(item.fecha).toLocaleString('es-PE', { timeZone: 'America/Lima', dateStyle: 'short', timeStyle: 'short' })}</span>
                 <button type="button" className="text-teal-800 font-bold" onClick={() => abrirArchivo(`/api/consulta/adjuntos/${item.id}`, item.tipo)}>Abrir</button>
                 <button type="button" className="text-rose-700 font-bold" onClick={() => eliminarAdjuntoConsulta(item.id)}>Eliminar</button>
               </div>)}
@@ -1070,6 +1099,7 @@ function ConsultorioPageContent() {
           </div>
         </div>
       )}
+      {pdfConsultaId !== null && <div className="fixed inset-0 z-[60] bg-slate-900/90 p-3 sm:p-6 flex flex-col" role="dialog" aria-modal="true" aria-label="Ficha de consultorio en PDF"><div className="mx-auto w-full max-w-5xl flex items-center justify-between rounded-t-xl bg-white px-4 py-3"><strong className="text-sm text-slate-900">Ficha de consultorio · PDF</strong><div className="flex gap-2"><a href={`/api/consulta/pdf?id=${pdfConsultaId}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800">Imprimir / descargar</a><button type="button" onClick={() => setPdfConsultaId(null)} aria-label="Cerrar PDF y regresar al consultorio" className="rounded-lg bg-slate-900 px-3 py-2 text-white font-bold">✕ Regresar</button></div></div><iframe src={`/api/consulta/pdf?id=${pdfConsultaId}`} title="Ficha de consultorio PDF" className="mx-auto w-full max-w-5xl flex-1 rounded-b-xl bg-white" /></div>}
       {/* MODAL CON ZOOM Y CONTROL INTERACTIVO */}
       {imagenModal && (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-50 flex flex-col items-center justify-between p-4 sm:p-6 animate-fadeIn">

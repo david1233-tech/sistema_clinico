@@ -23,6 +23,7 @@ type PacienteRecepcion = Partial<EdicionPaciente> & {
   dni_paciente?: string;
   nombre_paciente?: string;
 };
+type AdjuntoConsulta = { id: number; nombre: string; tipo: string; fecha: string; consulta_id: number };
 
 const normalizarBusqueda = (texto: string) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
@@ -35,6 +36,8 @@ function RecepcionPageContent() {
   const [paciente, setPaciente] = useState<any>(null);
   const [triajes, setTriajes] = useState<any[]>([]);
   const [consultas, setConsultas] = useState<any[]>([]);
+  const [adjuntosConsultas, setAdjuntosConsultas] = useState<AdjuntoConsulta[]>([]);
+  const [adjuntoVisible, setAdjuntoVisible] = useState<{ url: string; tipo: string; nombre: string } | null>(null);
   const [tratamientos, setTratamientos] = useState<any[]>([]);
   const [errorVitaminas, setErrorVitaminas] = useState('');
   const [pacientesRegistrados, setPacientesRegistrados] = useState<PacienteRecepcion[]>([]);
@@ -61,6 +64,7 @@ function RecepcionPageContent() {
     try {
       setLoading(true);
       setTratamientos([]);
+      setAdjuntosConsultas([]);
       setErrorVitaminas('');
       
       let dataTodos: any[] = [];
@@ -98,14 +102,18 @@ function RecepcionPageContent() {
             const resCons = await fetch(`/api/consulta?dni=${dniFinal}`);
             if (resCons.ok) {
               const consData = await resCons.json();
-              if (consData.length > 0 && !consData[0].imagen_url) {
-                const resAdjuntos = await fetch(`/api/consulta/adjuntos?id=${consData[0].id}`);
-                if (resAdjuntos.ok) {
-                  const adjuntos = await resAdjuntos.json();
-                  const primeraImagen = adjuntos.find((item: { tipo: string }) => item.tipo.startsWith('image/'));
-                  if (primeraImagen) consData[0].imagen_url = `/api/consulta/adjuntos/${primeraImagen.id}`;
-                }
-              }
+              const listas = await Promise.all(consData.map(async (item: { id: number }) => {
+                try {
+                  const respuesta = await fetch(`/api/consulta/adjuntos?id=${item.id}`, { cache: 'no-store' });
+                  if (!respuesta.ok) return [];
+                  const adjuntos: Omit<AdjuntoConsulta, 'consulta_id'>[] = await respuesta.json();
+                  return adjuntos.map(adjunto => ({ ...adjunto, consulta_id: item.id }));
+                } catch { return []; }
+              }));
+              const todosAdjuntos = listas.flat();
+              setAdjuntosConsultas(todosAdjuntos);
+              const primeraImagen = todosAdjuntos.find(item => item.tipo.startsWith('image/'));
+              if (primeraImagen && consData.length > 0 && !consData[0].imagen_url) consData[0].imagen_url = `/api/consulta/adjuntos/${primeraImagen.id}`;
               setConsultas(consData);
               if (consData.length > 0) {
                 setConsultaImprimir(consData[0]);
@@ -607,20 +615,13 @@ function RecepcionPageContent() {
                   <span className="text-xs font-extrabold text-purple-800 uppercase bg-purple-100 px-3 py-1 rounded-lg">
                     🧪 Examen / Imagen Clínica Adjunta
                   </span>
-                  {consultas.length > 0 && consultas[0].imagen_url ? (
-                    <div className="flex flex-col items-center gap-3">
-                      <img 
-                        src={consultas[0].imagen_url} 
-                        alt="Examen clínico" 
-                        className="max-w-md w-full max-h-[400px] object-contain rounded-xl border shadow-md bg-white p-2" 
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setMostrarModalImagen(true)}
-                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-extrabold text-xs cursor-pointer shadow-sm"
-                      >
-                        🔍 Ver Imagen en Pantalla Completa
-                      </button>
+                  {adjuntosConsultas.length > 0 || consultas.some(c => c.imagen_url) ? (
+                    <div className="grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-3 text-left">
+                      {adjuntosConsultas.map(adjunto => <button key={adjunto.id} type="button" onClick={() => setAdjuntoVisible({ url: `/api/consulta/adjuntos/${adjunto.id}`, tipo: adjunto.tipo, nombre: adjunto.nombre })} className="rounded-xl border border-purple-200 bg-white p-3 text-left hover:bg-purple-50">
+                        {adjunto.tipo.startsWith('image/') ? <img src={`/api/consulta/adjuntos/${adjunto.id}`} alt={adjunto.nombre} className="h-32 w-full rounded-lg object-contain bg-slate-50" /> : <div className="h-32 flex items-center justify-center text-4xl">📄</div>}
+                        <strong className="block mt-2 truncate text-xs text-slate-900">{adjunto.nombre}</strong><span className="text-[11px] text-slate-500">{new Date(adjunto.fecha).toLocaleString('es-PE', { timeZone: 'America/Lima', dateStyle: 'short', timeStyle: 'short' })}</span>
+                      </button>)}
+                      {consultas.filter(c => c.imagen_url && !adjuntosConsultas.some(a => `/api/consulta/adjuntos/${a.id}` === c.imagen_url)).map(c => <button key={`antigua-${c.id}`} type="button" onClick={() => setAdjuntoVisible({ url: c.imagen_url, tipo: 'image/jpeg', nombre: 'Imagen clínica anterior' })} className="rounded-xl border border-purple-200 bg-white p-3 text-left"><img src={c.imagen_url} alt="Imagen clínica anterior" className="h-32 w-full object-contain" /></button>)}
                     </div>
                   ) : (
                     <p className="text-xs text-slate-400 italic py-6">No hay imágenes o exámenes clínicos adjuntos para este paciente.</p>
@@ -641,13 +642,15 @@ function RecepcionPageContent() {
                       consultas.map((c: any, index: number) => (
                         <div key={index} className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                           <div className="text-xs text-slate-700 flex flex-col gap-1.5 max-w-2xl">
-                            <span className="text-teal-700 font-extrabold">📅 Fecha: {String(c.fecha || '').split('T')[0]} • Dr. Administrador</span>
+                            <span className="text-teal-700 font-extrabold">📅 Fecha y hora: {c.fecha && !Number.isNaN(new Date(c.fecha).getTime()) ? new Date(c.fecha).toLocaleString('es-PE', { timeZone: 'America/Lima', dateStyle: 'short', timeStyle: 'short' }) : c.fecha} • Dr. Administrador</span>
                             <p className="m-0"><strong>Motivo:</strong> {c.motivo || c.motivo_consulta || 'Sin motivo'}</p>
                             <p className="m-0"><strong>Diagnóstico:</strong> {c.diagnostico || 'Sin diagnóstico.'}</p>
                             {c.receta && <p className="m-0 text-emerald-800"><strong>Receta:</strong> {c.receta}</p>}
-                            {c.dieta && <p className="m-0 text-purple-900 font-medium"><strong>Dieta:</strong> {c.dieta}</p>}
+                            {c.dieta && <p className="m-0 text-purple-900 font-medium whitespace-pre-wrap"><strong>Dieta:</strong> {c.dieta}</p>}
+                            {adjuntosConsultas.filter(a => a.consulta_id === c.id).map(a => <button key={a.id} type="button" onClick={() => setAdjuntoVisible({ url: `/api/consulta/adjuntos/${a.id}`, tipo: a.tipo, nombre: a.nombre })} className="w-fit text-left text-sky-800 underline">{a.tipo.startsWith('image/') ? '🖼️' : '📄'} {a.nombre} · {new Date(a.fecha).toLocaleString('es-PE', { timeZone: 'America/Lima', dateStyle: 'short', timeStyle: 'short' })}</button>)}
                           </div>
                           <div className="flex items-center gap-2">
+                            <button type="button" onClick={() => window.open(`/api/consulta/pdf?id=${c.id}`, '_blank', 'noopener,noreferrer')} className="px-3 py-2 bg-sky-50 text-sky-800 border border-sky-200 rounded-xl font-extrabold text-xs">📄 Ver ficha PDF</button>
                             <button
                               type="button"
                               onClick={() => handleImprimirRecetaIndividual(c)}
@@ -744,6 +747,7 @@ function RecepcionPageContent() {
           </div>
         </div>
       )}
+      {adjuntoVisible && <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/90 p-4" role="dialog" aria-modal="true" aria-label="Visor de adjunto clínico"><div className="mx-auto flex w-full max-w-5xl items-center justify-between rounded-t-xl bg-white p-3"><strong className="truncate text-sm text-slate-900">{adjuntoVisible.nombre}</strong><button type="button" onClick={() => setAdjuntoVisible(null)} className="rounded-lg bg-slate-900 px-3 py-2 text-white font-bold">✕ Regresar</button></div>{adjuntoVisible.tipo === 'application/pdf' ? <iframe src={adjuntoVisible.url} title={adjuntoVisible.nombre} className="mx-auto w-full max-w-5xl flex-1 bg-white" /> : <div className="mx-auto flex w-full max-w-5xl flex-1 items-center justify-center overflow-auto bg-slate-950"><img src={adjuntoVisible.url} alt={adjuntoVisible.nombre} className="max-h-[80vh] max-w-full object-contain" /></div>}</div>}
 
       {/* SECCIÓN DE IMPRESIÓN 1: RECETA INDIVIDUAL */}
       {paciente && (

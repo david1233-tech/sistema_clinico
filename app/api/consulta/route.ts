@@ -32,11 +32,12 @@ export async function POST(request: Request) {
   const dni = String(body.dni_paciente ?? '').trim();
   if (!/^\d{8}$/.test(dni)) return NextResponse.json({ error: 'DNI requerido' }, { status: 400 });
   try {
+    const fecha = new Date().toISOString();
     const [result] = await pool.execute<ResultSetHeader>(
       'INSERT INTO consultas (dni_paciente, fecha, motivo, diagnostico, receta, dieta, imagen_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [dni, new Date().toISOString().slice(0, 19).replace('T', ' '), String(body.motivo ?? ''), String(body.diagnostico ?? ''), String(body.receta ?? ''), String(body.dieta ?? ''), body.imagen_url ? String(body.imagen_url) : null]
+      [dni, fecha, String(body.motivo ?? ''), String(body.diagnostico ?? ''), String(body.receta ?? ''), String(body.dieta ?? ''), body.imagen_url ? String(body.imagen_url) : null]
     );
-    return NextResponse.json({ success: true, id: result.insertId }, { status: 201 });
+    return NextResponse.json({ success: true, id: result.insertId, fecha }, { status: 201 });
   } catch (error) {
     return databaseError(error);
   }
@@ -53,4 +54,3 @@ export async function DELETE(request: Request) {
     return databaseError(error);
   }
 }
-
