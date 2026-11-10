@@ -46,6 +46,15 @@ export async function POST(request: Request) {
         await client.query('ROLLBACK');
         return NextResponse.json({ error: 'Paciente no encontrado' }, { status: 404 });
       }
+      const cantidad = await client.query(`SELECT (
+        (SELECT COUNT(*) FROM vitaminas_paciente_adjuntos WHERE dni_paciente = $1) +
+        (SELECT COUNT(*) FROM triaje_vitaminas_imagenes WHERE dni_paciente = $1) +
+        (SELECT COUNT(*) FROM vitaminas_adjuntos a JOIN recetas r ON r.id = a.receta_id WHERE r.dni_paciente = $1)
+      )::int AS total`, [dni]);
+      if (cantidad.rows[0].total >= 200) {
+        await client.query('ROLLBACK');
+        return NextResponse.json({ error: 'Máximo 200 imágenes o PDF por paciente.' }, { status: 409 });
+      }
       const result = await client.query('INSERT INTO vitaminas_paciente_adjuntos (dni_paciente, nombre, tipo, contenido) VALUES ($1,$2,$3,$4) RETURNING id, nombre, tipo, fecha', [dni, archivo.name.slice(0, 255), archivo.type, Buffer.from(await archivo.arrayBuffer())]);
       await client.query('COMMIT');
       return NextResponse.json({ ...result.rows[0], origen: 'paciente' });
@@ -71,4 +80,3 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'No se pudo eliminar el archivo' }, { status: 500 });
   }
 }
-

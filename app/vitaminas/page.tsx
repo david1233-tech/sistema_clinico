@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { agruparSesiones } from '@/lib/vitaminas-sesiones';
 import { normalizarBusqueda } from '@/lib/busqueda-pacientes';
+import VitaminasSeguimiento from '@/components/VitaminasSeguimiento';
 
 interface Paciente {
   id: string | number;
@@ -181,6 +182,9 @@ function VitaminasPageContent() {
   const [vitaminasAdicionales, setVitaminasAdicionales] = useState<VitaminaAdicional[]>([]);
   const siguienteAdicionalId = useRef(0);
   const [galeriaAbierta, setGaleriaAbierta] = useState(false);
+  const [fichaAbierta, setFichaAbierta] = useState(false);
+  const [filtroAdjuntos, setFiltroAdjuntos] = useState<'todos' | 'imagenes' | 'pdf'>('todos');
+  const [busquedaAdjuntos, setBusquedaAdjuntos] = useState('');
   const [adjuntos, setAdjuntos] = useState<AdjuntoVitamina[]>([]);
   const [subiendoAdjuntos, setSubiendoAdjuntos] = useState(false);
   const [cargandoAdjuntos, setCargandoAdjuntos] = useState(false);
@@ -340,6 +344,7 @@ function VitaminasPageContent() {
       !confirm('Los datos del formulario que aún no guardó se perderán. ¿Cambiar de paciente?')) return;
     setPacienteSeleccionado(p);
     setGaleriaAbierta(false);
+    setFichaAbierta(false);
     setRegistroEditando(null);
     setVitaminasAdicionales([]);
     setFormVitamina({ vitaminaNombre: '', dosis: '', via: '', observaciones: '' });
@@ -480,6 +485,7 @@ function VitaminasPageContent() {
     event.target.value = '';
     const dni = pacienteSeleccionado?.dni_paciente;
     if (!dni || !archivos.length || cargandoAdjuntos) return;
+    if (adjuntos.length + archivos.length > 200) return alert('Máximo 200 imágenes o PDF por paciente.');
     if (archivos.some(file => !TIPOS_ADJUNTOS.includes(file.type) || !file.size || file.size > 3 * 1024 * 1024)) return alert('Solo imágenes JPG, PNG, WebP, GIF o PDF de hasta 3 MB por archivo.');
     setSubiendoAdjuntos(true);
     try {
@@ -550,6 +556,7 @@ function VitaminasPageContent() {
   const tratamientosPaciente = tratamientos.filter(t => t.dni_paciente === pacienteSeleccionado?.dni_paciente);
   const sesionesPaciente = agruparSesiones(tratamientosPaciente);
   const adjuntosPacienteCount = adjuntos.filter(item => item.origen === 'paciente').length;
+  const adjuntosVisibles = adjuntos.filter(item => (filtroAdjuntos === 'todos' || (filtroAdjuntos === 'pdf' ? item.tipo === 'application/pdf' : item.tipo !== 'application/pdf')) && normalizarBusqueda(item.nombre).includes(normalizarBusqueda(busquedaAdjuntos)));
   const opcionesVitamina = busquedaVitamina.trim() ? CATALOGO_VITAMINAS.filter(nombre => normalizarBusqueda(nombre).includes(normalizarBusqueda(busquedaVitamina))).slice(0, 12) : [];
 
   return (
@@ -731,11 +738,16 @@ function VitaminasPageContent() {
                     </div>
                   </div>
 
-                  <section className="module-patient-files xl:col-span-2 rounded-2xl border border-teal-200 bg-white p-5 md:p-6 shadow-sm" aria-label="Archivos del paciente">
+                  <div className="order-2 xl:col-span-2 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm print:hidden">
+                    <div className="flex flex-wrap items-center justify-between gap-3"><div><span className="text-xs font-bold uppercase text-sky-700">Seguimiento clínico</span><h3 className="m-0 text-base font-black text-slate-900">Controles diarios y procedimientos</h3></div><button type="button" onClick={() => setFichaAbierta(prev => !prev)} className="rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-bold text-white">{fichaAbierta ? 'Cerrar ficha' : 'Abrir ficha de seguimiento'}</button></div>
+                  </div>
+                  {fichaAbierta && <VitaminasSeguimiento key={pacienteSeleccionado.dni_paciente} dni={pacienteSeleccionado.dni_paciente} nombre={pacienteSeleccionado.nombre_paciente} />}
+
+                  <section className="module-patient-files order-4 xl:col-span-2 rounded-2xl border border-teal-200 bg-white p-5 md:p-6 shadow-sm" aria-label="Archivos del paciente">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div>
                         <span className="text-[11px] uppercase tracking-wider font-extrabold text-teal-700">Documentación del paciente</span>
-                        <h3 className="m-0 mt-1 text-base font-black text-slate-900">Fotos y archivos · {adjuntos.length} guardados</h3>
+                        <h3 className="m-0 mt-1 text-base font-black text-slate-900">Fotos y PDF · {adjuntos.length}/200 guardados</h3>
                         <p className="m-0 mt-1 text-xs text-slate-500">Puede subirlos ahora, antes de registrar vitaminas o sueros. Conserva los adjuntos anteriores.</p>
                       </div>
                       <button type="button" onClick={() => setGaleriaAbierta(true)} className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-xs font-extrabold text-teal-900 hover:bg-teal-100">Ver archivos</button>
@@ -744,11 +756,11 @@ function VitaminasPageContent() {
                       ＋ Agregar imágenes o PDF
                       <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={subirAdjuntos} disabled={subiendoAdjuntos || cargandoAdjuntos} className="sr-only" />
                     </label>
-                    <p className="m-0 mt-2 text-xs text-slate-500">{adjuntosPacienteCount} archivos nuevos · Hasta 3 MB por archivo.</p>
+                    <p className="m-0 mt-2 text-xs text-slate-500">{adjuntosPacienteCount} archivos agregados aquí · Hasta 200 por paciente · 3 MB por archivo.</p>
                     {avanceAdjuntos && <p role="status" className="m-0 mt-2 text-xs font-bold text-teal-800">{avanceAdjuntos}</p>}
                   </section>
 
-                  <form id="formulario-vitamina" onSubmit={handleGuardarVitamina} className="bg-white rounded-2xl border border-teal-200 p-5 md:p-6 shadow-sm flex flex-col gap-4 scroll-mt-24 min-w-0">
+                  <form id="formulario-vitamina" onSubmit={handleGuardarVitamina} className="order-1 xl:col-span-2 bg-white rounded-2xl border border-teal-200 p-5 md:p-6 shadow-sm flex flex-col gap-4 scroll-mt-24 min-w-0">
                     <div className="bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 p-4 rounded-xl text-white flex items-center gap-3">
                       <span className="text-2xl">🧪</span>
                       <div>
@@ -906,7 +918,7 @@ function VitaminasPageContent() {
                       </button>
                     </div>
                   </form>
-                  <div className="bg-white rounded-2xl border border-sky-200 p-5 md:p-6 shadow-sm min-w-0">
+                  <div className="order-5 xl:col-span-2 bg-white rounded-2xl border border-sky-200 p-5 md:p-6 shadow-sm min-w-0">
                     <h3 className="m-0 text-sm md:text-base font-extrabold text-teal-900">Historial de aplicaciones ({sesionesPaciente.length})</h3>
                     {tratamientosPaciente.length === 0 ? (
                       <p className="text-xs text-slate-500 mb-0">Este paciente aún no tiene tratamientos guardados.</p>
@@ -954,8 +966,9 @@ function VitaminasPageContent() {
                     </label>
                     <p className="text-xs text-slate-500">Hasta 3 MB por archivo. Los adjuntos de tratamientos anteriores permanecen aquí.</p>
                     {avanceAdjuntos && <p role="status" className="text-xs font-bold text-teal-800">{avanceAdjuntos}</p>}
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                      {adjuntos.map(item => <div key={`${item.origen}-${item.id}`} className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs min-w-0">
+                    <div className="mt-4 flex flex-wrap gap-2"><input type="search" value={busquedaAdjuntos} onChange={e => setBusquedaAdjuntos(e.target.value)} placeholder="Buscar archivo por nombre" aria-label="Buscar archivo" className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm" />{(['todos', 'imagenes', 'pdf'] as const).map(filtro => <button key={filtro} type="button" onClick={() => setFiltroAdjuntos(filtro)} aria-pressed={filtroAdjuntos === filtro} className={`rounded-lg px-3 py-2 text-xs font-bold ${filtroAdjuntos === filtro ? 'bg-sky-700 text-white' : 'bg-sky-50 text-sky-800'}`}>{filtro === 'imagenes' ? 'Imágenes' : filtro === 'pdf' ? 'PDF' : 'Todos'}</button>)}</div>
+                    <div className="mt-4 max-h-[45vh] overflow-y-auto grid gap-2 sm:grid-cols-2">
+                      {adjuntosVisibles.map(item => <div key={`${item.origen}-${item.id}`} className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs min-w-0">
                         <span aria-hidden="true">{item.tipo === 'application/pdf' ? '📄' : '🖼️'}</span>
                         <span className="min-w-0 flex-1 truncate" title={item.nombre}>{item.nombre}{item.origen === 'tratamiento' && <small className="block text-slate-500">Tratamiento anterior</small>}{item.origen === 'triaje_vitaminas' && <small className="block text-violet-700">Vitaminas desde Enfermería · Aplicación: {item.fecha_aplicacion ? new Date(item.fecha_aplicacion).toLocaleString('es-PE') : 'Sin fecha'} · Subida: {new Date(item.fecha).toLocaleString('es-PE')}</small>}</span>
                         <a href={`${item.origen === 'paciente' ? '/api/vitaminas/paciente-adjuntos' : item.origen === 'triaje_vitaminas' ? '/api/triaje/vitaminas-imagenes' : '/api/vitaminas/adjuntos'}/${item.id}`} target="_blank" rel="noopener noreferrer" className="font-bold text-teal-800">Abrir</a>
@@ -979,4 +992,3 @@ export default function VitaminasPage() {
     </Suspense>
   );
 }
-

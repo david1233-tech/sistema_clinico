@@ -165,6 +165,17 @@ html[data-intro-seen] .intro {
   }
 }
 
+@media print {
+  body:has(#ficha-seguimiento) * { visibility: hidden !important; }
+  body:has(#ficha-seguimiento) #ficha-seguimiento,
+  body:has(#ficha-seguimiento) #ficha-seguimiento * { visibility: visible !important; }
+  #ficha-seguimiento { position: absolute; inset: 0 auto auto 0; width: 100%; background: white; }
+  #ficha-seguimiento .overflow-x-auto { overflow: visible !important; }
+  #ficha-seguimiento table { min-width: 0 !important; font-size: 8px; }
+  #ficha-seguimiento th, #ficha-seguimiento td { padding: 3px !important; }
+  @page { size: A4 landscape; margin: 12mm; }
+}
+
 /* Lenguaje visual compartido por los módulos clínicos. */
 .module-shell {
   background: radial-gradient(circle at 85% 0%, #e4f5f1 0, transparent 30%),
