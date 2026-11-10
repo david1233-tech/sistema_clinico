@@ -39,6 +39,7 @@ function RecepcionPageContent() {
   const [errorVitaminas, setErrorVitaminas] = useState('');
   const [pacientesRegistrados, setPacientesRegistrados] = useState<PacienteRecepcion[]>([]);
   const [filtroPacientes, setFiltroPacientes] = useState<string | null>(null);
+  const [paginaPacientes, setPaginaPacientes] = useState(1);
   const [loading, setLoading] = useState<boolean>(true);
   const [edicionPaciente, setEdicionPaciente] = useState<EdicionPaciente | null>(null);
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
@@ -240,6 +241,9 @@ function RecepcionPageContent() {
     return normalizarBusqueda(nombre).includes(filtroNormalizado) ||
       String(p.dni || p.dni_paciente || '').includes(filtroNormalizado);
   });
+  const paginasPacientes = Math.max(1, Math.ceil(pacientesVisibles.length / 6));
+  const paginaVisible = Math.min(paginaPacientes, paginasPacientes);
+  const pacientesPagina = pacientesVisibles.slice((paginaVisible - 1) * 6, paginaVisible * 6);
   const sesionesVitaminas = agruparSesiones(tratamientos.map((item: Record<string, unknown>) => ({
     id: Number(item.id),
     vitaminaNombre: String(item.vitaminaNombre ?? item.vitaminanombre ?? item.medicamento ?? 'Vitamina o suero'),
@@ -325,8 +329,55 @@ function RecepcionPageContent() {
         {/* CUERPO PRINCIPAL */}
         <main className="p-4 sm:p-8 flex flex-col gap-6 max-w-7xl mx-auto w-full no-print">
           
+          {/* DIRECTORIO DE PACIENTES, VISIBLE AL ENTRAR */}
+          {!dniBuscado && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-7 shadow-sm">
+              <div className="mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+                <div>
+                <div className="text-[11px] font-extrabold text-teal-600 uppercase tracking-wider">
+                  Padrón Activo
+                </div>
+                <h3 className="m-0 text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
+                  Pacientes registrados ({pacientesRegistrados.length}) · por apellido A-Z
+                </h3>
+                </div>
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto"><input type="search" value={filtroPacientes ?? busquedaParam} onChange={e => { setFiltroPacientes(e.target.value); setPaginaPacientes(1); }} placeholder="Buscar nombre, apellido o DNI" aria-label="Buscar pacientes registrados" className="min-w-0 flex-1 sm:w-72 px-3 py-2.5 rounded-xl border border-slate-300 bg-white text-sm text-slate-900 outline-none focus:border-teal-600" /><NuevoPacienteModal /></div>
+              </div>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-sky-50 px-3 py-2 text-xs text-sky-900"><span className="font-bold">Mostrando {pacientesVisibles.length ? (paginaVisible - 1) * 6 + 1 : 0}–{Math.min(paginaVisible * 6, pacientesVisibles.length)} de {pacientesVisibles.length} pacientes</span><div className="flex items-center gap-2"><button type="button" onClick={() => setPaginaPacientes(prev => Math.max(1, prev - 1))} disabled={paginaVisible <= 1} className="rounded-lg border border-sky-200 bg-white px-3 py-1.5 font-bold text-sky-800 disabled:opacity-40">Anterior</button><span className="min-w-16 text-center font-bold">{paginaVisible} / {paginasPacientes}</span><button type="button" onClick={() => setPaginaPacientes(prev => Math.min(paginasPacientes, prev + 1))} disabled={paginaVisible >= paginasPacientes} className="rounded-lg border border-sky-200 bg-white px-3 py-1.5 font-bold text-sky-800 disabled:opacity-40">Siguiente</button></div></div>
+              {loading ? (
+                <div role="status" className="py-10 text-center text-sm text-slate-600">Cargando pacientes...</div>
+              ) : pacientesRegistrados.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 text-xs sm:text-sm">
+                  No existen pacientes registrados actualmente en el sistema.
+                </div>
+              ) : pacientesVisibles.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-xs sm:text-sm">
+                  No hay pacientes que coincidan con la búsqueda.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {pacientesPagina.map((p) => <article key={p.id || p.dni || p.dni_paciente} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-2">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center font-extrabold shrink-0">{p.nombre?.charAt(0).toUpperCase() || 'P'}</div>
+                      <div className="min-w-0"><a href={`/recepcion?dni=${p.dni || p.dni_paciente}`} className="font-extrabold text-slate-900 hover:text-sky-700 no-underline break-words">{p.nombre}</a><p className="text-xs text-slate-500 m-0">DNI {p.dni || p.dni_paciente}</p></div>
+                    </div>
+                    <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600"><span>☎ {p.telefono || 'Sin teléfono'}</span><span className="break-words">⌖ {p.direccion || 'Sin dirección'}</span></div>
+                    <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
+                      <BotonSeleccionarPaciente dni={p.dni || p.dni_paciente || ''} nombre={p.nombre} />
+                      <a href={`/recepcion?dni=${p.dni || p.dni_paciente}`} className="px-3 py-2 bg-sky-50 text-sky-700 border border-sky-200 rounded-xl font-extrabold text-xs no-underline">📄 Expediente</a>
+                      <a href={`/enfermeria?dni=${p.dni || p.dni_paciente}`} className="px-3 py-2 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl font-extrabold text-xs no-underline">🩺 Triaje</a>
+                      <button type="button" onClick={() => iniciarEdicionPaciente(p)} className="px-3 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl font-extrabold text-xs">✏️ Editar</button>
+                      <a href={`/recepcion?dni=${encodeURIComponent(p.dni || p.dni_paciente || '')}&vista=vitaminas`} className="px-3 py-2 bg-sky-50 text-sky-800 border border-sky-200 rounded-xl font-extrabold text-xs no-underline">💉 Muestra de vitaminas</a>
+                      <button type="button" onClick={() => handleEliminarPaciente(p)} className="px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-extrabold text-xs" aria-label={`Eliminar ${p.nombre}`}>🗑️</button>
+                    </div>
+                  </article>)}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* BUSCADOR */}
-          <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-4 sm:p-7 border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          {dniBuscado && <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl p-4 sm:p-7 border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div className="max-w-xl">
               <div className="inline-flex items-center gap-1.5 bg-sky-100 text-sky-700 px-2.5 py-1 rounded-md text-[11px] font-extrabold uppercase tracking-wide mb-2">
                 ⚡ Buscador de Expedientes
@@ -375,7 +426,7 @@ function RecepcionPageContent() {
                 <NuevoPacienteModal />
               </div>
             </div>
-          </div>
+          </div>}
 
           {dniBuscado && !paciente && !loading && (
             <div className="bg-white p-6 sm:p-8 rounded-2xl border border-rose-200 text-center shadow-sm">
@@ -626,57 +677,6 @@ function RecepcionPageContent() {
                   <p className="m-0 mt-1 text-xs text-slate-600">{paciente.nombre} · DNI {paciente.dni || paciente.dni_paciente} · Una tarjeta por fecha de aplicación</p>
                   {errorVitaminas ? <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-white p-4 text-sm text-rose-700">{errorVitaminas}</p> : sesionesVitaminas.length === 0 ? <p className="mt-4 rounded-xl border border-sky-200 bg-white p-4 text-sm text-slate-600">Este paciente aún no tiene vitaminas o sueros registrados.</p> : <div className="mt-4 grid gap-4 md:grid-cols-2">{sesionesVitaminas.map(([dia, aplicaciones]) => <article key={dia} className="rounded-xl border border-sky-200 bg-white p-4 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-100 pb-2"><strong className="text-sm text-sky-900">Fecha: {dia.startsWith('registro-') ? 'Sin fecha' : dia.split('-').reverse().join('/')}</strong><span className="text-xs font-semibold text-slate-600">{aplicaciones.length} {aplicaciones.length === 1 ? 'producto' : 'productos'}</span></div><div className="mt-3 space-y-3">{aplicaciones.map(item => <div key={item.id} className="border-t border-sky-100 pt-3 first:border-t-0 first:pt-0 text-xs text-slate-700"><strong className="block text-sm text-slate-900">{item.vitaminaNombre}</strong><span className="block mt-1">Dosis: {item.dosis || 'Sin dato'} · Vía: {item.via || 'Sin dato'}</span>{item.fechaAplicacion && !Number.isNaN(new Date(item.fechaAplicacion).getTime()) && <span className="block mt-1">Hora: {new Date(item.fechaAplicacion).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' })}</span>}{item.observaciones && <p className="m-0 mt-1 whitespace-pre-wrap">{item.observaciones}</p>}</div>)}</div></article>)}</div>}
                 </section>
-              )}
-            </div>
-          )}
-
-          {/* TABLA PADRÓN ACTIVO */}
-          {!dniBuscado && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-7 shadow-sm">
-              <div className="mb-5 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-                <div>
-                <div className="text-[11px] font-extrabold text-teal-600 uppercase tracking-wider">
-                  Padrón Activo
-                </div>
-                <h3 className="m-0 text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
-                  Pacientes registrados ({pacientesRegistrados.length}) · por apellido A-Z
-                </h3>
-                </div>
-                <input
-                  type="search"
-                  value={filtroPacientes ?? busquedaParam}
-                  onChange={(e) => setFiltroPacientes(e.target.value)}
-                  placeholder="Inicial del apellido, nombre o DNI"
-                  aria-label="Buscar pacientes por inicial del apellido, nombre o DNI"
-                  className="w-full sm:w-72 px-3 py-2.5 rounded-xl border border-slate-300 bg-white text-sm text-slate-900 outline-none focus:border-teal-600"
-                />
-              </div>
-              {pacientesRegistrados.length === 0 ? (
-                <div className="text-center py-12 text-slate-400 text-xs sm:text-sm">
-                  No existen pacientes registrados actualmente en el sistema.
-                </div>
-              ) : pacientesVisibles.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs sm:text-sm">
-                  No hay pacientes que coincidan con la búsqueda.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {pacientesVisibles.map((p) => <article key={p.id || p.dni || p.dni_paciente} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 flex flex-col gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center font-extrabold shrink-0">{p.nombre?.charAt(0).toUpperCase() || 'P'}</div>
-                      <div className="min-w-0"><a href={`/recepcion?dni=${p.dni || p.dni_paciente}`} className="font-extrabold text-slate-900 hover:text-sky-700 no-underline break-words">{p.nombre}</a><p className="text-xs text-slate-500 m-0">DNI {p.dni || p.dni_paciente}</p></div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600"><span>☎ {p.telefono || 'Sin teléfono'}</span><span className="break-words">⌖ {p.direccion || 'Sin dirección'}</span></div>
-                    <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
-                      <BotonSeleccionarPaciente dni={p.dni || p.dni_paciente || ''} nombre={p.nombre} />
-                      <a href={`/recepcion?dni=${p.dni || p.dni_paciente}`} className="px-3 py-2 bg-sky-50 text-sky-700 border border-sky-200 rounded-xl font-extrabold text-xs no-underline">📄 Expediente</a>
-                      <a href={`/enfermeria?dni=${p.dni || p.dni_paciente}`} className="px-3 py-2 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl font-extrabold text-xs no-underline">🩺 Triaje</a>
-                      <button type="button" onClick={() => iniciarEdicionPaciente(p)} className="px-3 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl font-extrabold text-xs">✏️ Editar</button>
-                      <a href={`/recepcion?dni=${encodeURIComponent(p.dni || p.dni_paciente || '')}&vista=vitaminas`} className="px-3 py-2 bg-sky-50 text-sky-800 border border-sky-200 rounded-xl font-extrabold text-xs no-underline">💉 Muestra de vitaminas</a>
-                      <button type="button" onClick={() => handleEliminarPaciente(p)} className="px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-extrabold text-xs" aria-label={`Eliminar ${p.nombre}`}>🗑️</button>
-                    </div>
-                  </article>)}
-                </div>
               )}
             </div>
           )}
