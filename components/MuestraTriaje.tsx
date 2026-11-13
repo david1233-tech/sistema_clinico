@@ -24,6 +24,8 @@ export default function MuestraTriaje({ dni }: { dni: string }) {
   const [erroresFecha, setErroresFecha] = useState<Record<number, string>>({});
   const [lectura, setLectura] = useState<{ actual: number; total: number } | null>(null);
   const [avisoLectura, setAvisoLectura] = useState('');
+  const [erroresImagen, setErroresImagen] = useState<Record<number, boolean>>({});
+  const [reintentosImagen, setReintentosImagen] = useState<Record<number, number>>({});
   const [seleccionada, setSeleccionada] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [desplazamiento, setDesplazamiento] = useState({ x: 0, y: 0 });
@@ -42,6 +44,9 @@ export default function MuestraTriaje({ dni }: { dni: string }) {
         if (controller.signal.aborted) return;
         setFotos(items);
         setCargando(false);
+        // Deja que las miniaturas se dibujen antes de iniciar la lectura de texto.
+        await new Promise(resolve => window.setTimeout(resolve, 750));
+        if (controller.signal.aborted) return;
         const pendientes = items.filter(foto => !foto.fecha_consulta);
         if (!pendientes.length) return;
         setLectura({ actual: 0, total: pendientes.length });
@@ -86,6 +91,10 @@ export default function MuestraTriaje({ dni }: { dni: string }) {
     setDesplazamiento({ x: 0, y: 0 });
     pellizco.current = null;
     arrastre.current = null;
+  };
+  const reintentarImagen = (id: number) => {
+    setErroresImagen(actual => ({ ...actual, [id]: false }));
+    setReintentosImagen(actual => ({ ...actual, [id]: (actual[id] || 0) + 1 }));
   };
 
   const iniciarGesto = (event: React.TouchEvent<HTMLDivElement>) => {
@@ -149,8 +158,8 @@ export default function MuestraTriaje({ dni }: { dni: string }) {
   return (
     <section className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4 sm:p-6" aria-label="Muestra de triaje del paciente">
       <h3 className="m-0 text-lg font-extrabold text-violet-900">Fotos de triaje</h3>
-      <p className="mt-1 text-xs text-slate-600">Fotos de Enfermería. Las fechas de consulta se leen de la ficha cuando son legibles; puede corregirlas debajo de cada imagen.</p>
-      {lectura && <p role="status" className="mt-2 text-xs font-semibold text-violet-800">Leyendo fechas de las fichas: {lectura.actual} de {lectura.total}</p>}
+      <p className="mt-1 text-xs text-slate-600">Toque una foto para verla en grande. Se muestran aunque la fecha de consulta todavía no se haya identificado.</p>
+      {lectura && <p role="status" className="mt-2 text-xs font-semibold text-violet-800">Fotos visibles · Leyendo fecha de consulta: {lectura.actual} de {lectura.total}</p>}
       {avisoLectura && <p role="alert" className="mt-2 text-xs text-amber-800">{avisoLectura}</p>}
       <div className="mt-4 flex flex-wrap items-end gap-3 no-print">
         <label className="text-xs font-bold text-slate-700">Desde
@@ -166,17 +175,17 @@ export default function MuestraTriaje({ dni }: { dni: string }) {
         : fotos.length === 0 ? <p className="mt-4 text-sm text-slate-600">Este paciente aún no tiene fotos de triaje.</p>
         : visibles.length === 0 ? <p className="mt-4 text-sm text-slate-600">No hay fotos subidas en las fechas seleccionadas.</p>
         : <div className="mt-5 grid grid-cols-2 gap-2 sm:gap-4">
-            {visibles.map(foto => (
+            {visibles.map((foto, indice) => (
               <article key={foto.id} className="min-w-0 break-inside-avoid rounded-xl border border-violet-200 bg-white p-3 shadow-sm">
-                <div className="mb-2 text-xs text-slate-700">
+                <button type="button" onClick={() => erroresImagen[foto.id] ? reintentarImagen(foto.id) : abrirFoto(foto.id)} aria-label={erroresImagen[foto.id] ? `Reintentar foto ${foto.nombre}` : `Ampliar foto de triaje ${foto.nombre}`} className="mx-auto flex aspect-square w-full max-w-[28rem] items-center justify-center overflow-hidden rounded-lg bg-slate-100 cursor-zoom-in">
+                  {erroresImagen[foto.id] ? <span className="p-3 text-center text-xs font-semibold text-rose-700">No se pudo mostrar la foto. Toque para reintentar.</span> :
+                    <img src={`/api/triaje/adjuntos/${foto.id}?r=${reintentosImagen[foto.id] || 0}`} alt={`Foto de triaje: ${foto.nombre}`} loading={indice < 2 ? 'eager' : 'lazy'} decoding="async" onError={() => setErroresImagen(actual => ({ ...actual, [foto.id]: true }))} className="h-full w-full object-contain transition-transform duration-200" style={{ transform: `rotate(${rotaciones[foto.id] || 0}deg)` }} />}
+                </button>
+                <div className="mt-2 text-xs text-slate-700">
                   <strong className="block break-words text-sm text-slate-900">{foto.nombre}</strong>
-                  <span className="block">{foto.fecha_consulta ? `Consulta: ${foto.fecha_consulta.split('-').reverse().join('/')}` : 'Fecha de consulta pendiente'}</span>
+                  {foto.fecha_consulta && <span className="block">Consulta: {foto.fecha_consulta.split('-').reverse().join('/')}</span>}
                   <span className="block text-slate-500">Subida: {new Date(foto.fecha).toLocaleString('es-PE', { timeZone: 'America/Lima', dateStyle: 'medium', timeStyle: 'short' })}</span>
                 </div>
-                <button type="button" onClick={() => abrirFoto(foto.id)} aria-label={`Ampliar foto de triaje ${foto.nombre}`} className="mx-auto flex aspect-square w-full max-w-[28rem] items-center justify-center overflow-hidden rounded-lg bg-slate-100 cursor-zoom-in">
-                  {/* La superficie cuadrada mantiene visible la imagen al girarla 90 grados. */}
-                  <img src={`/api/triaje/adjuntos/${foto.id}`} alt={`Foto de triaje: ${foto.nombre}`} className="h-full w-full object-contain transition-transform duration-200" style={{ transform: `rotate(${rotaciones[foto.id] || 0}deg)` }} />
-                </button>
                 <div className="mt-3 flex flex-wrap items-end gap-2 no-print">
                   <label className="min-w-0 text-xs font-bold text-slate-700">Fecha de consulta en la ficha
                     <input type="date" value={fechaEditada[foto.id] ?? foto.fecha_consulta ?? ''} onChange={e => { cambiosManuales.current.add(foto.id); setFechaEditada(actual => ({ ...actual, [foto.id]: e.target.value })); }} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm" />
