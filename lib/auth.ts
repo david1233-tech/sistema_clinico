@@ -45,6 +45,7 @@ export function allows(role: Role, pathname: string, method: string) {
     if (pathname.startsWith('/api/pacientes')) return true;
     if (pathname.startsWith('/api/reniec')) return true;
     if (pathname.startsWith('/api/recetas')) return isGet;
+    if (pathname === '/api/triaje/adjuntos' && method === 'PATCH') return role === 'recepcion' || role === 'enfermera';
     if (pathname.startsWith('/api/triaje')) return role === 'enfermera' || isGet;
     if (pathname.startsWith('/api/consulta')) return role === 'recepcion' && isGet;
     if (pathname.startsWith('/api/internados') || pathname.startsWith('/api/vitaminas')) return role === 'enfermera';
@@ -56,3 +57,4 @@ export function allows(role: Role, pathname: string, method: string) {
   if (['/agenda', '/caja'].some(path => pathname.startsWith(path))) return role === 'recepcion';
   return false;
 }
+

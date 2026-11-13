@@ -35,3 +35,10 @@ test('recepción puede consultar vitaminas sin acceder a su edición', () => {
   assert.equal(allows('recepcion', '/api/recetas', 'GET'), true);
   assert.equal(allows('recepcion', '/api/recetas', 'POST'), false);
 });
+
+test('recepción solo puede corregir la fecha de adjuntos de triaje', () => {
+  assert.equal(allows('recepcion', '/api/triaje/adjuntos', 'PATCH'), true);
+  assert.equal(allows('recepcion', '/api/triaje/adjuntos', 'POST'), false);
+  assert.equal(allows('recepcion', '/api/triaje', 'PATCH'), false);
+});
+

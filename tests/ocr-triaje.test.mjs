@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { extraerDatosTriaje } from '../lib/ocr-triaje.ts';
+import { extraerDatosTriaje, extraerFechaConsultaTriaje } from '../lib/ocr-triaje.ts';
+
+test('extrae solo la fecha de consulta y valida el calendario', () => {
+  assert.equal(extraerFechaConsultaTriaje('Fecha de subida: 10/11/2026\nFecha de consulta: 05/03/2024'), '2024-03-05');
+  assert.equal(extraerFechaConsultaTriaje('FECHA DE CONSULTA:\n2025-12-09'), '2025-12-09');
+  assert.equal(extraerFechaConsultaTriaje('Fecha de consulta: 31/02/2025'), null);
+  assert.equal(extraerFechaConsultaTriaje('Fecha de emisión: 05/03/2024'), null);
+});
 
 test('asocia signos vitales y datos opcionales de una ficha impresa', () => {
   const texto = [

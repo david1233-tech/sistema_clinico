@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS triaje_adjuntos (
   nombre VARCHAR(255) NOT NULL,
   tipo VARCHAR(100) NOT NULL,
   contenido BYTEA NOT NULL,
-  fecha TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  fecha TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  fecha_consulta DATE
 );
 CREATE INDEX IF NOT EXISTS triaje_adjuntos_triaje_id_idx ON triaje_adjuntos (triaje_id);
 
@@ -168,3 +169,4 @@ CREATE TABLE IF NOT EXISTS vitaminas_procedimientos (
   actualizado_en TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS vitaminas_procedimientos_dni_idx ON vitaminas_procedimientos (dni_paciente);
+

@@ -240,13 +240,6 @@ function RecepcionPageContent() {
     }, 150);
   };
 
-  const handleImprimirHistorialClinico = () => {
-    setTipoImpresion('historial');
-    setTimeout(() => {
-      window.print();
-    }, 150);
-  };
-
   const filtroNormalizado = normalizarBusqueda((filtroPacientes ?? busquedaParam).trim());
   const pacientesVisibles = pacientesRegistrados.filter((p) => {
     const nombre = String(p.nombre || p.nombre_paciente || '');
@@ -407,7 +400,6 @@ function RecepcionPageContent() {
                     <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
                       <BotonSeleccionarPaciente dni={p.dni || p.dni_paciente || ''} nombre={p.nombre} />
                       <a href={`/recepcion?dni=${p.dni || p.dni_paciente}`} className="px-3 py-2 bg-sky-50 text-sky-700 border border-sky-200 rounded-xl font-extrabold text-xs no-underline">📄 Expediente</a>
-                      <a href={`/enfermeria?dni=${p.dni || p.dni_paciente}`} className="px-3 py-2 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl font-extrabold text-xs no-underline">🩺 Triaje</a>
                       <button type="button" onClick={() => iniciarEdicionPaciente(p)} className="px-3 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl font-extrabold text-xs">✏️ Editar</button>
                       <a href={`/recepcion?dni=${encodeURIComponent(p.dni || p.dni_paciente || '')}&vista=vitaminas`} className="px-3 py-2 bg-sky-50 text-sky-800 border border-sky-200 rounded-xl font-extrabold text-xs no-underline">💉 Muestra de vitaminas</a>
                       <a href={`/recepcion?dni=${encodeURIComponent(p.dni || p.dni_paciente || '')}&vista=triaje`} className="px-3 py-2 bg-violet-50 text-violet-800 border border-violet-200 rounded-xl font-extrabold text-xs no-underline">🩺 Muestra de triaje</a>
@@ -509,22 +501,7 @@ function RecepcionPageContent() {
                   </button>
                   <a href={`/recepcion?dni=${encodeURIComponent(paciente.dni || paciente.dni_paciente)}&vista=vitaminas`} className="px-4 py-2.5 rounded-xl border border-sky-200 bg-sky-50 text-sky-800 font-extrabold text-xs no-underline">💉 Muestra de vitaminas</a>
                   <a href={`/recepcion?dni=${encodeURIComponent(paciente.dni || paciente.dni_paciente)}&vista=triaje`} className="px-4 py-2.5 rounded-xl border border-violet-200 bg-violet-50 text-violet-800 font-extrabold text-xs no-underline">🩺 Muestra de triaje</a>
-                  <button
-                    type="button"
-                    onClick={() => handleImprimirRecetaIndividual(consultas.length > 0 ? consultas[0] : null)}
-                    className="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-extrabold text-xs cursor-pointer shadow-md transition-all flex items-center gap-1.5"
-                  >
-                    <span>🖨️</span> Imprimir Receta (1 Hoja)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleImprimirHistorialClinico}
-                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-extrabold text-xs cursor-pointer shadow-md transition-all flex items-center gap-1.5"
-                  >
-                    <span>🖨️</span> Imprimir Historial Clínico (Opción 3)
-                  </button>
                   <BotonSeleccionarPaciente dni={paciente.dni || paciente.dni_paciente} nombre={paciente.nombre} />
-                  <a href={`/enfermeria?dni=${encodeURIComponent(paciente.dni || paciente.dni_paciente)}`} className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-extrabold text-xs no-underline">🩺 Ir a Triaje</a>
                 </div>
               </div>
 

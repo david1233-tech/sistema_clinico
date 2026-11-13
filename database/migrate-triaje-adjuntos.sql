@@ -8,4 +8,5 @@ CREATE TABLE IF NOT EXISTS triaje_adjuntos (
   fecha TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS triaje_adjuntos_triaje_id_idx ON triaje_adjuntos (triaje_id);
+ALTER TABLE triaje_adjuntos ADD COLUMN IF NOT EXISTS fecha_consulta DATE;
 

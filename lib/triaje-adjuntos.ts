@@ -11,8 +11,10 @@ export function ensureTriajeAdjuntos() {
         nombre VARCHAR(255) NOT NULL,
         tipo VARCHAR(100) NOT NULL,
         contenido BYTEA NOT NULL,
-        fecha TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        fecha TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        fecha_consulta DATE
       )`);
+      await pgPool.query('ALTER TABLE triaje_adjuntos ADD COLUMN IF NOT EXISTS fecha_consulta DATE');
       await pgPool.query('CREATE INDEX IF NOT EXISTS triaje_adjuntos_triaje_id_idx ON triaje_adjuntos (triaje_id)');
     })().catch(error => {
       initialized = undefined;

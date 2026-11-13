@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     await ensureTriajeAdjuntos();
     if (dni) {
       const result = await pgPool.query(
-        `SELECT a.id, a.nombre, a.tipo, a.fecha, a.triaje_id
+        `SELECT a.id, a.nombre, a.tipo, a.fecha, a.triaje_id, a.fecha_consulta::text AS fecha_consulta
          FROM triaje_adjuntos a
          JOIN triaje t ON t.id = a.triaje_id
          WHERE t.dni_paciente = $1 AND a.tipo LIKE 'image/%'
@@ -25,12 +25,30 @@ export async function GET(request: Request) {
       return NextResponse.json(result.rows);
     }
     const result = await pgPool.query(
-      'SELECT id, nombre, tipo, fecha FROM triaje_adjuntos WHERE triaje_id = $1 ORDER BY id', [id]
+      'SELECT id, nombre, tipo, fecha, fecha_consulta::text AS fecha_consulta FROM triaje_adjuntos WHERE triaje_id = $1 ORDER BY id', [id]
     );
     return NextResponse.json(result.rows);
   } catch (error) {
     console.error('Error al listar adjuntos:', error);
     return NextResponse.json({ error: 'No se pudieron cargar los adjuntos' }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  let body: { id?: unknown; fecha_consulta?: unknown };
+  try { body = await request.json(); } catch { return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 }); }
+  const id = String(body.id ?? '');
+  const fecha = body.fecha_consulta;
+  if (!/^\d+$/.test(id) || (fecha !== null && (typeof fecha !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(`${fecha}T00:00:00Z`)) || new Date(`${fecha}T00:00:00Z`).toISOString().slice(0, 10) !== fecha))) {
+    return NextResponse.json({ error: 'Fecha de consulta inválida' }, { status: 400 });
+  }
+  try {
+    await ensureTriajeAdjuntos();
+    const result = await pgPool.query('UPDATE triaje_adjuntos SET fecha_consulta = $1::date WHERE id = $2 RETURNING id, fecha_consulta::text AS fecha_consulta', [fecha, id]);
+    return result.rowCount ? NextResponse.json(result.rows[0]) : NextResponse.json({ error: 'Imagen no encontrada' }, { status: 404 });
+  } catch (error) {
+    console.error('Error al guardar fecha de consulta:', error);
+    return NextResponse.json({ error: 'No se pudo guardar la fecha de consulta' }, { status: 500 });
   }
 }
 

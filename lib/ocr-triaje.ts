@@ -51,6 +51,28 @@ function normalizar(texto: string) {
   return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/₂/g, '2').toLowerCase();
 }
 
+// Solo usa fechas junto a la etiqueta de consulta; otras fechas de la ficha pueden ser distintas.
+export function extraerFechaConsultaTriaje(texto: string): string | null {
+  const lineas = texto.split(/\r?\n/).map(linea => normalizar(linea).replace(/[oO](?=\d)|(?<=\d)[oO]/g, '0'));
+  const patronFecha = /\b(\d{1,2})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{2,4})\b|\b(20\d{2})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{1,2})\b/;
+  for (let i = 0; i < lineas.length; i++) {
+    const etiqueta = /\bfecha\s*(?:de\s*)?consulta\b/.exec(lineas[i]);
+    if (!etiqueta) continue;
+    const textoFecha = `${lineas[i].slice(etiqueta.index + etiqueta[0].length)} ${lineas[i + 1] || ''}`;
+    const coincidencia = patronFecha.exec(textoFecha);
+    if (!coincidencia) continue;
+    const anio = coincidencia[4] ? Number(coincidencia[4]) : Number(coincidencia[3].length === 2 ? `20${coincidencia[3]}` : coincidencia[3]);
+    const mes = Number(coincidencia[4] ? coincidencia[5] : coincidencia[2]);
+    const dia = Number(coincidencia[4] ? coincidencia[6] : coincidencia[1]);
+    if (anio < 2000 || anio > new Date().getFullYear() + 1) continue;
+    const fecha = new Date(Date.UTC(anio, mes - 1, dia));
+    if (fecha.getUTCFullYear() === anio && fecha.getUTCMonth() + 1 === mes && fecha.getUTCDate() === dia) {
+      return `${anio}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+    }
+  }
+  return null;
+}
+
 const RANGOS_LECTURA: Partial<Record<Campo, [number, number]>> = {
   edad: [0, 120], talla: [30, 250], peso: [1, 500], imc: [5, 100],
   pulso: [1, 300], so2: [1, 100], temperatura: [20, 45],
