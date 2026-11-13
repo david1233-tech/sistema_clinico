@@ -26,6 +26,9 @@ export default function MuestraTriaje({ dni }: { dni: string }) {
   const [avisoLectura, setAvisoLectura] = useState('');
   const [seleccionada, setSeleccionada] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [desplazamiento, setDesplazamiento] = useState({ x: 0, y: 0 });
+  const pellizco = useRef<{ distancia: number; zoom: number } | null>(null);
+  const arrastre = useRef<{ x: number; y: number; origenX: number; origenY: number } | null>(null);
   const cambiosManuales = useRef(new Set<number>());
 
   useEffect(() => {
@@ -77,7 +80,46 @@ export default function MuestraTriaje({ dni }: { dni: string }) {
 
   const rotar = (id: number, grados: number) => setRotaciones(actual => ({ ...actual, [id]: ((actual[id] || 0) + grados + 360) % 360 }));
   const fotoSeleccionada = fotos.find(foto => foto.id === seleccionada);
-  const abrirFoto = (id: number) => { setSeleccionada(id); setZoom(1); };
+  const abrirFoto = (id: number) => {
+    setSeleccionada(id);
+    setZoom(1);
+    setDesplazamiento({ x: 0, y: 0 });
+    pellizco.current = null;
+    arrastre.current = null;
+  };
+
+  const iniciarGesto = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (event.touches.length === 2) {
+      pellizco.current = {
+        distancia: Math.hypot(event.touches[0].clientX - event.touches[1].clientX, event.touches[0].clientY - event.touches[1].clientY),
+        zoom
+      };
+      arrastre.current = null;
+    } else if (event.touches.length === 1 && zoom > 1) {
+      arrastre.current = { x: event.touches[0].clientX, y: event.touches[0].clientY, origenX: desplazamiento.x, origenY: desplazamiento.y };
+    }
+  };
+
+  const moverGesto = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (event.touches.length === 2 && pellizco.current?.distancia) {
+      const distancia = Math.hypot(event.touches[0].clientX - event.touches[1].clientX, event.touches[0].clientY - event.touches[1].clientY);
+      const nuevoZoom = Math.min(4, Math.max(0.5, pellizco.current.zoom * distancia / pellizco.current.distancia));
+      setZoom(nuevoZoom);
+      if (nuevoZoom <= 1) setDesplazamiento({ x: 0, y: 0 });
+    } else if (event.touches.length === 1 && arrastre.current && zoom > 1) {
+      setDesplazamiento({
+        x: arrastre.current.origenX + event.touches[0].clientX - arrastre.current.x,
+        y: arrastre.current.origenY + event.touches[0].clientY - arrastre.current.y
+      });
+    }
+  };
+
+  const terminarGesto = (event: React.TouchEvent<HTMLDivElement>) => {
+    pellizco.current = null;
+    arrastre.current = event.touches.length === 1 && zoom > 1
+      ? { x: event.touches[0].clientX, y: event.touches[0].clientY, origenX: desplazamiento.x, origenY: desplazamiento.y }
+      : null;
+  };
 
   useEffect(() => {
     if (seleccionada === null) return;
@@ -156,14 +198,15 @@ export default function MuestraTriaje({ dni }: { dni: string }) {
           <strong className="max-w-full truncate text-sm">{fotoSeleccionada.nombre}</strong>
           <button type="button" onClick={() => setSeleccionada(null)} className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-900">✕ Cerrar</button>
         </div>
-        <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-lg bg-black">
-          <img src={`/api/triaje/adjuntos/${fotoSeleccionada.id}`} alt={`Foto ampliada: ${fotoSeleccionada.nombre}`} draggable={false} className="max-h-[70vh] max-w-[90vw] object-contain transition-transform duration-150" style={{ transform: `rotate(${rotaciones[fotoSeleccionada.id] || 0}deg) scale(${zoom})` }} />
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-black" style={{ touchAction: 'none' }} onTouchStart={iniciarGesto} onTouchMove={moverGesto} onTouchEnd={terminarGesto} onTouchCancel={terminarGesto}>
+          <img src={`/api/triaje/adjuntos/${fotoSeleccionada.id}`} alt={`Foto ampliada: ${fotoSeleccionada.nombre}`} draggable={false} className="max-h-[70vh] max-w-[90vw] select-none object-contain" style={{ transform: `translate(${desplazamiento.x}px, ${desplazamiento.y}px) rotate(${rotaciones[fotoSeleccionada.id] || 0}deg) scale(${zoom})` }} />
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2 pt-3 text-xs">
+          <span className="w-full text-center text-slate-300 sm:hidden">Use dos dedos para acercar o alejar; arrastre con uno para mover la foto.</span>
           <button type="button" onClick={() => setZoom(valor => Math.max(0.5, Math.round((valor - 0.25) * 100) / 100))} className="rounded-lg bg-white px-3 py-2 font-bold text-slate-900">− Alejar</button>
           <span className="min-w-12 text-center font-bold">{Math.round(zoom * 100)}%</span>
           <button type="button" onClick={() => setZoom(valor => Math.min(4, Math.round((valor + 0.25) * 100) / 100))} className="rounded-lg bg-white px-3 py-2 font-bold text-slate-900">+ Acercar</button>
-          <button type="button" onClick={() => setZoom(1)} className="rounded-lg bg-slate-700 px-3 py-2 font-bold">Restablecer zoom</button>
+          <button type="button" onClick={() => { setZoom(1); setDesplazamiento({ x: 0, y: 0 }); }} className="rounded-lg bg-slate-700 px-3 py-2 font-bold">Restablecer zoom</button>
           <button type="button" onClick={() => rotar(fotoSeleccionada.id, -90)} className="rounded-lg bg-violet-700 px-3 py-2 font-bold">↶ Girar izquierda</button>
           <button type="button" onClick={() => rotar(fotoSeleccionada.id, 90)} className="rounded-lg bg-violet-700 px-3 py-2 font-bold">↷ Girar derecha</button>
         </div>
