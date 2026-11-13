@@ -55,7 +55,7 @@ export default function MuestraTriaje({ dni }: { dni: string }) {
         : error ? <p role="alert" className="mt-4 text-sm text-rose-700">{error}</p>
         : fotos.length === 0 ? <p className="mt-4 text-sm text-slate-600">Este paciente aún no tiene fotos de triaje.</p>
         : visibles.length === 0 ? <p className="mt-4 text-sm text-slate-600">No hay fotos subidas en las fechas seleccionadas.</p>
-        : <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+        : <div className="mt-5 grid grid-cols-2 gap-2 sm:gap-4">
             {visibles.map(foto => (
               <article key={foto.id} className="min-w-0 break-inside-avoid rounded-xl border border-violet-200 bg-white p-3 shadow-sm">
                 <div className="mb-2 text-xs text-slate-700">
