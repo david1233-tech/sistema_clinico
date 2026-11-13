@@ -32,6 +32,7 @@ function RecepcionPageContent() {
   const searchParams = useSearchParams();
   const dniParam = searchParams.get('dni');
   const vistaSolicitada = searchParams.get('vista');
+  const vistaTriaje = vistaSolicitada === 'triaje' && Boolean(dniParam);
   const busquedaParam = searchParams.get('buscar')?.trim() || '';
   const dniBuscado = dniParam ? dniParam.replace(/\D/g, '').trim() : /^\d{8}$/.test(busquedaParam) ? busquedaParam : '';
   const [paciente, setPaciente] = useState<any>(null);
@@ -54,7 +55,7 @@ function RecepcionPageContent() {
   const [mostrarModalImagen, setMostrarModalImagen] = useState<boolean>(false);
   const [consultaImprimir, setConsultaImprimir] = useState<any>(null);
   const [tipoImpresion, setTipoImpresion] = useState<'receta' | 'historial'>('receta');
-  const [tabActiva, setTabActiva] = useState<'resumen' | 'imagen' | 'consultas' | 'vitaminas' | 'triaje'>(vistaSolicitada === 'vitaminas' || vistaSolicitada === 'triaje' ? vistaSolicitada : 'resumen');
+  const [tabActiva, setTabActiva] = useState<'resumen' | 'imagen' | 'consultas' | 'vitaminas'>(vistaSolicitada === 'vitaminas' ? 'vitaminas' : 'resumen');
   const [consultasDesplegadas, setConsultasDesplegadas] = useState<boolean>(true);
 
   useEffect(() => {
@@ -270,7 +271,22 @@ function RecepcionPageContent() {
           body * {
             visibility: hidden !important;
           }
-          ${tipoImpresion === 'receta' ? `
+          ${vistaTriaje ? `
+            #print-section-triaje, #print-section-triaje * {
+              visibility: visible !important;
+            }
+            #print-section-triaje {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
+              margin: 0 !important;
+              padding: 10mm !important;
+              background: white !important;
+            }
+            #print-section-triaje article { break-inside: avoid; }
+            #print-section-triaje .aspect-square { aspect-ratio: auto; height: 95mm; }
+          ` : tipoImpresion === 'receta' ? `
             #print-section-receta, #print-section-receta * {
               visibility: visible !important;
             }
@@ -307,14 +323,12 @@ function RecepcionPageContent() {
         }
       `}</style>
 
-      <div className="no-print">
-        <Sidebar />
-      </div>
+      {!vistaTriaje && <div className="no-print"><Sidebar /></div>}
 
-      <div className="module-content flex-1 flex flex-col w-full min-w-0 lg:ml-[270px] transition-all">
+      <div className={`module-content flex-1 flex flex-col w-full min-w-0 transition-all ${vistaTriaje ? '' : 'lg:ml-[270px]'}`}>
         
         {/* HEADER SUPERIOR */}
-        <header className="h-auto min-h-[70px] py-3 bg-white border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 sm:px-8 sticky top-0 z-20 gap-3 shadow-sm no-print">
+        {!vistaTriaje && <header className="h-auto min-h-[70px] py-3 bg-white border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 sm:px-8 sticky top-0 z-20 gap-3 shadow-sm no-print">
           <div>
             <div className="text-[11px] text-slate-500 font-extrabold uppercase tracking-wider">
               Módulo Clínico • Admisión General
@@ -333,10 +347,24 @@ function RecepcionPageContent() {
               <span className="text-xs text-emerald-800 font-extrabold">Recepción Vital Salud</span>
             </div>
           </div>
-        </header>
+        </header>}
 
         {/* CUERPO PRINCIPAL */}
-        <main className="p-4 sm:p-8 flex flex-col gap-6 max-w-7xl mx-auto w-full no-print">
+        <main className={`p-4 sm:p-8 flex flex-col gap-6 max-w-7xl mx-auto w-full ${vistaTriaje ? '' : 'no-print'}`}>
+          {vistaTriaje ? (
+            <div id="print-section-triaje" className="w-full">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 no-print">
+                <a href={`/recepcion?dni=${encodeURIComponent(dniBuscado)}`} className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 no-underline">← Volver al expediente</a>
+                <button type="button" onClick={() => window.print()} className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white">🖨️ Imprimir fotos</button>
+              </div>
+              {loading ? <p role="status" className="text-sm text-slate-600">Cargando paciente...</p> : paciente ? (
+                <>
+                  <h1 className="mb-3 text-xl font-extrabold text-slate-900">Muestra de triaje · {paciente.nombre} · DNI {paciente.dni || paciente.dni_paciente}</h1>
+                  <MuestraTriaje dni={paciente.dni || paciente.dni_paciente} />
+                </>
+              ) : <p role="alert" className="rounded-xl bg-white p-4 text-sm text-rose-700">No se encontró al paciente con DNI {dniBuscado}.</p>}
+            </div>
+          ) : <>
           
           {/* DIRECTORIO DE PACIENTES, VISIBLE AL ENTRAR */}
           {!dniBuscado && (
@@ -549,7 +577,7 @@ function RecepcionPageContent() {
                   🩺 Historial de Consultas & Acciones
                 </button>
                 <button type="button" onClick={() => setTabActiva('vitaminas')} className={`px-4 py-2 rounded-xl font-extrabold text-xs cursor-pointer transition-all ${tabActiva === 'vitaminas' ? 'bg-sky-700 text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>💉 Muestra de vitaminas</button>
-                <button type="button" onClick={() => setTabActiva('triaje')} className={`px-4 py-2 rounded-xl font-extrabold text-xs cursor-pointer transition-all ${tabActiva === 'triaje' ? 'bg-violet-700 text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>🩺 Muestra de triaje</button>
+                <a href={`/recepcion?dni=${encodeURIComponent(paciente.dni || paciente.dni_paciente)}&vista=triaje`} className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs no-underline">🩺 Muestra de triaje</a>
               </div>
 
               {/* CONTENIDO DE LA OPCIÓN 1: LOS 3 PRIMEROS CUADROS */}
@@ -685,10 +713,9 @@ function RecepcionPageContent() {
                   {errorVitaminas ? <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-white p-4 text-sm text-rose-700">{errorVitaminas}</p> : sesionesVitaminas.length === 0 ? <p className="mt-4 rounded-xl border border-sky-200 bg-white p-4 text-sm text-slate-600">Este paciente aún no tiene vitaminas o sueros registrados.</p> : <div className="mt-4 grid gap-4 md:grid-cols-2">{sesionesVitaminas.map(([dia, aplicaciones]) => <article key={dia} className="rounded-xl border border-sky-200 bg-white p-4 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-100 pb-2"><strong className="text-sm text-sky-900">Fecha: {dia.startsWith('registro-') ? 'Sin fecha' : dia.split('-').reverse().join('/')}</strong><span className="text-xs font-semibold text-slate-600">{aplicaciones.length} {aplicaciones.length === 1 ? 'producto' : 'productos'}</span></div><div className="mt-3 space-y-3">{aplicaciones.map(item => <div key={item.id} className="border-t border-sky-100 pt-3 first:border-t-0 first:pt-0 text-xs text-slate-700"><strong className="block text-sm text-slate-900">{item.vitaminaNombre}</strong><span className="block mt-1">Dosis: {item.dosis || 'Sin dato'} · Vía: {item.via || 'Sin dato'}</span>{item.fechaAplicacion && !Number.isNaN(new Date(item.fechaAplicacion).getTime()) && <span className="block mt-1">Hora: {new Date(item.fechaAplicacion).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' })}</span>}{item.observaciones && <p className="m-0 mt-1 whitespace-pre-wrap">{item.observaciones}</p>}</div>)}</div></article>)}</div>}
                 </section>
               )}
-              {tabActiva === 'triaje' && <MuestraTriaje key={paciente.dni || paciente.dni_paciente} dni={paciente.dni || paciente.dni_paciente} />}
             </div>
           )}
-
+          </>}
         </main>
       </div>
 
