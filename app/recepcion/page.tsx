@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import NuevoPacienteModal from '@/components/NuevoPacienteModal';
 import BotonSeleccionarPaciente from '@/components/BotonSeleccionarPaciente';
+import MuestraTriaje from '@/components/MuestraTriaje';
 import { primerApellido } from '@/lib/busqueda-pacientes';
 import { agruparSesiones } from '@/lib/vitaminas-sesiones';
 
@@ -30,7 +31,7 @@ const normalizarBusqueda = (texto: string) => texto.normalize('NFD').replace(/[\
 function RecepcionPageContent() {
   const searchParams = useSearchParams();
   const dniParam = searchParams.get('dni');
-  const vistaVitaminas = searchParams.get('vista') === 'vitaminas';
+  const vistaSolicitada = searchParams.get('vista');
   const busquedaParam = searchParams.get('buscar')?.trim() || '';
   const dniBuscado = dniParam ? dniParam.replace(/\D/g, '').trim() : /^\d{8}$/.test(busquedaParam) ? busquedaParam : '';
   const [paciente, setPaciente] = useState<any>(null);
@@ -53,7 +54,7 @@ function RecepcionPageContent() {
   const [mostrarModalImagen, setMostrarModalImagen] = useState<boolean>(false);
   const [consultaImprimir, setConsultaImprimir] = useState<any>(null);
   const [tipoImpresion, setTipoImpresion] = useState<'receta' | 'historial'>('receta');
-  const [tabActiva, setTabActiva] = useState<'resumen' | 'imagen' | 'consultas' | 'vitaminas'>(vistaVitaminas ? 'vitaminas' : 'resumen');
+  const [tabActiva, setTabActiva] = useState<'resumen' | 'imagen' | 'consultas' | 'vitaminas' | 'triaje'>(vistaSolicitada === 'vitaminas' || vistaSolicitada === 'triaje' ? vistaSolicitada : 'resumen');
   const [consultasDesplegadas, setConsultasDesplegadas] = useState<boolean>(true);
 
   useEffect(() => {
@@ -376,6 +377,7 @@ function RecepcionPageContent() {
                       <a href={`/enfermeria?dni=${p.dni || p.dni_paciente}`} className="px-3 py-2 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl font-extrabold text-xs no-underline">🩺 Triaje</a>
                       <button type="button" onClick={() => iniciarEdicionPaciente(p)} className="px-3 py-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl font-extrabold text-xs">✏️ Editar</button>
                       <a href={`/recepcion?dni=${encodeURIComponent(p.dni || p.dni_paciente || '')}&vista=vitaminas`} className="px-3 py-2 bg-sky-50 text-sky-800 border border-sky-200 rounded-xl font-extrabold text-xs no-underline">💉 Muestra de vitaminas</a>
+                      <a href={`/recepcion?dni=${encodeURIComponent(p.dni || p.dni_paciente || '')}&vista=triaje`} className="px-3 py-2 bg-violet-50 text-violet-800 border border-violet-200 rounded-xl font-extrabold text-xs no-underline">🩺 Muestra de triaje</a>
                       <button type="button" onClick={() => handleEliminarPaciente(p)} className="px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-extrabold text-xs" aria-label={`Eliminar ${p.nombre}`}>🗑️</button>
                     </div>
                   </article>)}
@@ -473,6 +475,7 @@ function RecepcionPageContent() {
                     ✏️ Editar paciente
                   </button>
                   <a href={`/recepcion?dni=${encodeURIComponent(paciente.dni || paciente.dni_paciente)}&vista=vitaminas`} className="px-4 py-2.5 rounded-xl border border-sky-200 bg-sky-50 text-sky-800 font-extrabold text-xs no-underline">💉 Muestra de vitaminas</a>
+                  <a href={`/recepcion?dni=${encodeURIComponent(paciente.dni || paciente.dni_paciente)}&vista=triaje`} className="px-4 py-2.5 rounded-xl border border-violet-200 bg-violet-50 text-violet-800 font-extrabold text-xs no-underline">🩺 Muestra de triaje</a>
                   <button
                     type="button"
                     onClick={() => handleImprimirRecetaIndividual(consultas.length > 0 ? consultas[0] : null)}
@@ -546,6 +549,7 @@ function RecepcionPageContent() {
                   🩺 Historial de Consultas & Acciones
                 </button>
                 <button type="button" onClick={() => setTabActiva('vitaminas')} className={`px-4 py-2 rounded-xl font-extrabold text-xs cursor-pointer transition-all ${tabActiva === 'vitaminas' ? 'bg-sky-700 text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>💉 Muestra de vitaminas</button>
+                <button type="button" onClick={() => setTabActiva('triaje')} className={`px-4 py-2 rounded-xl font-extrabold text-xs cursor-pointer transition-all ${tabActiva === 'triaje' ? 'bg-violet-700 text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>🩺 Muestra de triaje</button>
               </div>
 
               {/* CONTENIDO DE LA OPCIÓN 1: LOS 3 PRIMEROS CUADROS */}
@@ -681,6 +685,7 @@ function RecepcionPageContent() {
                   {errorVitaminas ? <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-white p-4 text-sm text-rose-700">{errorVitaminas}</p> : sesionesVitaminas.length === 0 ? <p className="mt-4 rounded-xl border border-sky-200 bg-white p-4 text-sm text-slate-600">Este paciente aún no tiene vitaminas o sueros registrados.</p> : <div className="mt-4 grid gap-4 md:grid-cols-2">{sesionesVitaminas.map(([dia, aplicaciones]) => <article key={dia} className="rounded-xl border border-sky-200 bg-white p-4 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-100 pb-2"><strong className="text-sm text-sky-900">Fecha: {dia.startsWith('registro-') ? 'Sin fecha' : dia.split('-').reverse().join('/')}</strong><span className="text-xs font-semibold text-slate-600">{aplicaciones.length} {aplicaciones.length === 1 ? 'producto' : 'productos'}</span></div><div className="mt-3 space-y-3">{aplicaciones.map(item => <div key={item.id} className="border-t border-sky-100 pt-3 first:border-t-0 first:pt-0 text-xs text-slate-700"><strong className="block text-sm text-slate-900">{item.vitaminaNombre}</strong><span className="block mt-1">Dosis: {item.dosis || 'Sin dato'} · Vía: {item.via || 'Sin dato'}</span>{item.fechaAplicacion && !Number.isNaN(new Date(item.fechaAplicacion).getTime()) && <span className="block mt-1">Hora: {new Date(item.fechaAplicacion).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' })}</span>}{item.observaciones && <p className="m-0 mt-1 whitespace-pre-wrap">{item.observaciones}</p>}</div>)}</div></article>)}</div>}
                 </section>
               )}
+              {tabActiva === 'triaje' && <MuestraTriaje key={paciente.dni || paciente.dni_paciente} dni={paciente.dni || paciente.dni_paciente} />}
             </div>
           )}
 
@@ -884,3 +889,4 @@ export default function RecepcionPage() {
     </Suspense>
   );
 }
+
