@@ -7,10 +7,23 @@ const MAX_BYTES = 3 * 1024 * 1024;
 const TIPOS = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']);
 
 export async function GET(request: Request) {
-  const id = new URL(request.url).searchParams.get('id');
-  if (!id || !/^\d+$/.test(id)) return NextResponse.json({ error: 'Triaje inválido' }, { status: 400 });
+  const searchParams = new URL(request.url).searchParams;
+  const id = searchParams.get('id');
+  const dni = searchParams.get('dni');
+  if (dni && !/^\d{8}$/.test(dni)) return NextResponse.json({ error: 'DNI inválido' }, { status: 400 });
+  if (!dni && (!id || !/^\d+$/.test(id))) return NextResponse.json({ error: 'Triaje inválido' }, { status: 400 });
   try {
     await ensureTriajeAdjuntos();
+    if (dni) {
+      const result = await pgPool.query(
+        `SELECT a.id, a.nombre, a.tipo, a.fecha, a.triaje_id
+         FROM triaje_adjuntos a
+         JOIN triaje t ON t.id = a.triaje_id
+         WHERE t.dni_paciente = $1 AND a.tipo LIKE 'image/%'
+         ORDER BY a.fecha DESC, a.id DESC`, [dni]
+      );
+      return NextResponse.json(result.rows);
+    }
     const result = await pgPool.query(
       'SELECT id, nombre, tipo, fecha FROM triaje_adjuntos WHERE triaje_id = $1 ORDER BY id', [id]
     );
