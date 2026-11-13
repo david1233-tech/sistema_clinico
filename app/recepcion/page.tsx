@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar';
 import NuevoPacienteModal from '@/components/NuevoPacienteModal';
 import BotonSeleccionarPaciente from '@/components/BotonSeleccionarPaciente';
 import MuestraTriaje from '@/components/MuestraTriaje';
+import UltimosTriajes from '@/components/UltimosTriajes';
 import { primerApellido } from '@/lib/busqueda-pacientes';
 import { agruparSesiones } from '@/lib/vitaminas-sesiones';
 
@@ -37,6 +38,7 @@ function RecepcionPageContent() {
   const dniBuscado = dniParam ? dniParam.replace(/\D/g, '').trim() : /^\d{8}$/.test(busquedaParam) ? busquedaParam : '';
   const [paciente, setPaciente] = useState<any>(null);
   const [triajes, setTriajes] = useState<any[]>([]);
+  const [errorTriajes, setErrorTriajes] = useState('');
   const [consultas, setConsultas] = useState<any[]>([]);
   const [adjuntosConsultas, setAdjuntosConsultas] = useState<AdjuntoConsulta[]>([]);
   const [adjuntoVisible, setAdjuntoVisible] = useState<{ url: string; tipo: string; nombre: string } | null>(null);
@@ -66,6 +68,8 @@ function RecepcionPageContent() {
     try {
       setLoading(true);
       setTratamientos([]);
+      setTriajes([]);
+      setErrorTriajes('');
       setAdjuntosConsultas([]);
       setErrorVitaminas('');
       
@@ -96,9 +100,10 @@ function RecepcionPageContent() {
           const dniFinal = encontrado.dni || encontrado.dni_paciente;
           
           try {
-            const resTriaje = await fetch(`/api/triaje?dni=${dniFinal}`);
-            if (resTriaje.ok) setTriajes(await resTriaje.json());
-          } catch (e) {}
+            const resTriaje = await fetch(`/api/triaje?dni=${encodeURIComponent(dniFinal)}`, { cache: 'no-store' });
+            if (!resTriaje.ok) throw new Error('No se pudieron cargar los triajes.');
+            setTriajes(await resTriaje.json());
+          } catch (e) { setErrorTriajes(e instanceof Error ? e.message : 'No se pudieron cargar los triajes.'); }
 
           try {
             const resCons = await fetch(`/api/consulta?dni=${dniFinal}`);
@@ -540,6 +545,8 @@ function RecepcionPageContent() {
                   <strong className="text-slate-900 text-xs sm:text-sm truncate block">{paciente.direccion || 'Sin dirección registrada'}</strong>
                 </div>
               </div>
+
+              {!loading && <UltimosTriajes registros={triajes} error={errorTriajes} />}
 
               {/* BARRA DE NAVEGACIÓN DE LAS 3 OPCIONES */}
               <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
